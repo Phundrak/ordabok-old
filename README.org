@@ -1,0 +1,27 @@
+#+title: Ordabok
+
+* Introduction
+Ordabok is a backend for multimedia dictionaries powered by its users.
+
+* Compiling and running the project
+This project requires an accessible PostgreSQL database (to store
+pretty much all of the project’s data), an Appwrite instance (for
+managing user accounts), and an S3 bucket (to store images, videos,
+and audio). Copy ~.env.example~ with
+#+begin_src shell
+$ cp .env.example .env
+#+end_src
+and modify the ~.env~ file accordingly. You will also need to set the
+variables for Appwrite and your S3 bucket.
+
+Once this is done, execute the following command to run the backend.
+#+begin_src shell
+$ cargo run
+# or
+$ cargo run --release
+#+end_src
+
+* License
+This project is under the AGPL 3.0 license. You can read the complete
+text [[file:LICENSE][here]], and if you just want a quick understanding of it, you can
+go [[https://tldrlegal.com/license/gnu-affero-general-public-license-v3-(agpl-3.0)][here]].
