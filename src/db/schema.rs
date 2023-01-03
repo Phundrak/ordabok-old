@@ -42,12 +42,12 @@ diesel::table! {
     languages (name) {
         name -> Varchar,
         native -> Nullable<Varchar>,
-        relese -> Release,
+        release -> Release,
         targetlanguage -> Array<Nullable<Text>>,
         genre -> Array<Nullable<Dictgenre>>,
         #[sql_name = "abstract"]
         abstract_ -> Nullable<Text>,
-        created -> Nullable<Timestamptz>,
+        created -> Timestamp,
         description -> Nullable<Text>,
         rights -> Nullable<Text>,
         license -> Nullable<Text>,

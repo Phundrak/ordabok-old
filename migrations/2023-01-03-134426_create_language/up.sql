@@ -6,11 +6,11 @@ CREATE TYPE AgentLanguageRelation as ENUM ('publisher', 'author');
 CREATE TABLE Languages (
   name VARCHAR(255) PRIMARY KEY,
   native VARCHAR(255),
-  relese Release NOT NULL,
+  release Release NOT NULL,
   targetLanguage TEXT[] NOT NULL,
   genre DictGenre[] NOT NULL,
   abstract TEXT,
-  created TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+  created TIMESTAMP DEFAULT CURRENT_TIMESTAMP NOT NULL,
   description TEXT,
   rights TEXT,
   license TEXT,

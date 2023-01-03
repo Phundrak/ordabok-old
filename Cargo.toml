@@ -6,5 +6,8 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-diesel = { version = "2.0", features = ["postgres"] }
+diesel = { version = "2.0", features = ["postgres", "chrono"] }
+diesel-derive-enum = { version = "2.0.0-rc.0", features = ["postgres"] }
+chrono = "0.4.23"
+
 dotenvy = "0.15"
