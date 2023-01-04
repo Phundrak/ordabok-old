@@ -5,7 +5,7 @@ Ordabok is a backend for multimedia dictionaries powered by its users.
 
 * Compiling and running the project
 This project requires an accessible PostgreSQL database (to store
-pretty much all of the project’s data), an Appwrite instance (for
+pretty much all of the project's data), an Appwrite instance (for
 managing user accounts), and an S3 bucket (to store images, videos,
 and audio). Copy ~.env.example~ with
 #+begin_src shell
