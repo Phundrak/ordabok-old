@@ -4,7 +4,7 @@ use rocket::State;
 use juniper::EmptySubscription;
 use juniper_rocket::{GraphQLRequest, GraphQLResponse};
 
-use crate::db::models::languages::Language;
+use crate::db::models::{languages::Language, users::User, words::Word};
 use crate::db::Database;
 
 #[derive(Debug)]
@@ -17,8 +17,32 @@ impl Query {
         context.all_languages().unwrap()
     }
 
-    fn language(context: &Database, name: String) -> Option<Language> {
-        context.language(name.as_str())
+    #[graphql(
+        description = "Retrieve a specific language from its name and its owner's id"
+    )]
+    fn language(
+        context: &Database,
+        name: String,
+        owner: String,
+    ) -> Option<Language> {
+        context.language(name.as_str(), owner.as_str())
+    }
+
+    #[graphql(description = "Retrieve a specific user from its id")]
+    fn user(context: &Database, id: String) -> Option<User> {
+        context.user(id.as_str())
+    }
+
+    #[graphql(description = "Retrieve a specific word from its id")]
+    fn word(context: &Database, id: String) -> Option<Word> {
+        context.word_id(id.as_str())
+    }
+
+    #[graphql(
+        description = "Retrieve all words with a set normal form from a set language"
+    )]
+    fn words(context: &Database, language: String, word: String) -> Vec<Word> {
+        context.words(language.as_str(), word.as_str())
     }
 }
 
@@ -31,7 +55,8 @@ impl Mutation {
     }
 }
 
-type Schema = juniper::RootNode<'static, Query, Mutation, EmptySubscription<Database>>;
+type Schema =
+    juniper::RootNode<'static, Query, Mutation, EmptySubscription<Database>>;
 
 pub fn create_schema() -> Schema {
     Schema::new(Query {}, Mutation {}, EmptySubscription::default())
@@ -57,7 +82,7 @@ pub async fn get_graphql_handler(
 pub fn post_graphql_handler(
     context: &State<Database>,
     request: GraphQLRequest,
-    schema: &State<Schema>
+    schema: &State<Schema>,
 ) -> GraphQLResponse {
     request.execute_sync(schema, context)
 }

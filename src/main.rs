@@ -60,7 +60,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     #[allow(clippy::let_underscore_drop, clippy::no_effect_underscore_binding)]
     let _ = rocket::build()
         .attach(cors)
-        .manage(db::Database::new())
+        .manage(db::Database::default())
         .manage(create_schema())
         .mount(
             "/",
