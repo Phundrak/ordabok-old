@@ -1,11 +1,11 @@
-use diesel::prelude::*;
 use super::super::schema::{wordrelation, words};
+use diesel::prelude::*;
 
 #[derive(diesel_derive_enum::DbEnum, Debug, Clone, PartialEq, Eq)]
 #[DieselTypePath = "crate::db::schema::sql_types::Wordrelationship"]
 pub enum WordRelationship {
     Definition,
-    Related
+    Related,
 }
 
 #[derive(diesel_derive_enum::DbEnum, Debug, Clone, PartialEq, Eq)]
@@ -27,7 +27,7 @@ pub enum PartOfSpeech {
     SubjConj,
     Symbol,
     Verb,
-    Other
+    Other,
 }
 
 #[derive(Queryable, Insertable, Debug, Clone, PartialEq, Eq)]

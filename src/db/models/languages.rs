@@ -1,5 +1,5 @@
+use super::super::schema::{langandagents, languages};
 use diesel::prelude::*;
-use super::super::schema::{languages, langandagents};
 
 #[derive(diesel_derive_enum::DbEnum, Debug, Clone, PartialEq, Eq)]
 #[DieselTypePath = "crate::db::schema::sql_types::Release"]
@@ -7,7 +7,7 @@ pub enum Release {
     Public,
     NonCommercial,
     Research,
-    Private
+    Private,
 }
 
 #[derive(diesel_derive_enum::DbEnum, Debug, Clone, PartialEq, Eq)]
@@ -19,14 +19,14 @@ pub enum DictGenre {
     Specialized,
     Historical,
     Orthography,
-    Terminology
+    Terminology,
 }
 
 #[derive(diesel_derive_enum::DbEnum, Debug, Clone, PartialEq, Eq)]
 #[DieselTypePath = "crate::db::schema::sql_types::Agentlanguagerelation"]
 pub enum AgentLanguageRelation {
     Publisher,
-    Author
+    Author,
 }
 
 #[derive(Queryable, Insertable, Debug, Clone, PartialEq, Eq)]

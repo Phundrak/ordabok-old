@@ -6,8 +6,18 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+# Environment variables
+dotenvy = "0.15"
+
+# Database
 diesel = { version = "2.0", features = ["postgres", "chrono"] }
 diesel-derive-enum = { version = "2.0.0-rc.0", features = ["postgres"] }
 chrono = "0.4.23"
 
-dotenvy = "0.15"
+# Web server
+rocket = "0.5.0-rc.2"
+rocket_cors = { git = "https://github.com/lawliet89/rocket_cors", rev = "c17e814" }
+
+# logging
+tracing = "0.1.37"
+tracing-subscriber = "0.3.16"
