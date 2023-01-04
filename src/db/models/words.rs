@@ -31,7 +31,7 @@ pub enum PartOfSpeech {
 }
 
 #[derive(Queryable, Insertable, Debug, Clone, PartialEq, Eq)]
-struct Word {
+pub struct Word {
     norm: String,
     native: Option<String>,
     lemma: Option<String>,
@@ -48,7 +48,7 @@ struct Word {
 
 #[derive(Queryable, Insertable, Debug, Clone, PartialEq, Eq)]
 #[diesel(table_name = wordrelation)]
-struct WordRelation {
+pub struct WordRelation {
     id: i32,
     wordsource: String,
     wordtarget: String,

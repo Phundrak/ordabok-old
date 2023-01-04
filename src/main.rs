@@ -1,6 +1,7 @@
 #![warn(clippy::style, clippy::pedantic)]
 
 mod db;
+mod graphql;
 
 use std::{env, error::Error};
 
@@ -44,6 +45,10 @@ fn make_cors() -> Result<rocket_cors::Cors, rocket_cors::Error> {
 
 #[rocket::main]
 async fn main() -> Result<(), Box<dyn Error>> {
+    use graphql::{
+        create_schema, get_graphql_handler, graphiql, post_graphql_handler,
+    };
+
     setup_logging();
 
     info!("Reading environment variables");
@@ -52,7 +57,20 @@ async fn main() -> Result<(), Box<dyn Error>> {
     let cors = make_cors()?;
     debug!("CORS: {:?}", cors);
 
-    #[allow(clippy::let_underscore_drop)]
-    let _ = rocket::build().attach(cors).launch().await?;
+    #[allow(clippy::let_underscore_drop, clippy::no_effect_underscore_binding)]
+    let _ = rocket::build()
+        .attach(cors)
+        .manage(db::Database::new())
+        .manage(create_schema())
+        .mount(
+            "/",
+            rocket::routes![
+                graphiql,
+                get_graphql_handler,
+                post_graphql_handler
+            ],
+        )
+        .launch()
+        .await?;
     Ok(())
 }
