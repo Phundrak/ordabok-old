@@ -12,7 +12,10 @@ pub struct Query;
 
 #[juniper::graphql_object(Context = Database)]
 impl Query {
-    #[graphql(name = "allLanguages")]
+    #[graphql(
+        name = "allLanguages",
+        description = "Retrieve all languages defined in the database"
+    )]
     fn all_languages(context: &Database) -> Vec<Language> {
         context.all_languages().unwrap()
     }
