@@ -1,0 +1,46 @@
+kind: pipeline
+type: docker
+name: rust
+
+steps:
+  - name: restore cache
+    image: drillster/drone-volume-cache
+    volumes:
+      - name: target
+        path: /target
+      - name: cargo
+        path: /cargo
+    settings:
+      restore: true
+      mount:
+        - ./target
+        - /usr/local/cargo
+
+  - name: compilation
+    image: rust
+    commands:
+      - cargo build --verbose
+
+  - name: tests
+    image: rust
+    commands:
+      - cargo test --verbose
+
+  - name: clippy
+    image: rust
+    commands:
+      - rustup component add clippy
+      - cargo clippy --verbose
+
+  - name: rebuild cache
+    image: drillster/drone-volume-cache
+    volumes:
+      - name: target
+        path: /target
+      - name: cargo
+        path: /cargo
+    settings:
+      rebuild: true
+      mount:
+        - ./target
+        - /usr/local/cargo
