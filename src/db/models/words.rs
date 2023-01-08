@@ -14,7 +14,9 @@ pub enum WordRelationship {
     Related,
 }
 
-#[derive(diesel_derive_enum::DbEnum, Debug, Clone, PartialEq, Eq, GraphQLEnum)]
+#[derive(
+    diesel_derive_enum::DbEnum, Debug, Clone, PartialEq, Eq, GraphQLEnum,
+)]
 #[DieselTypePath = "crate::db::schema::sql_types::Partofspeech"]
 pub enum PartOfSpeech {
     Adjective,
@@ -44,7 +46,7 @@ pub struct Word {
     norm: String,
     native: Option<String>,
     lemma: Option<String>,
-    language: String,
+    language: uuid::Uuid,
     partofspeech: PartOfSpeech,
     audio: Option<String>,
     video: Option<String>,
@@ -56,29 +58,30 @@ pub struct Word {
 }
 
 impl Word {
-    fn relationship(&self, context: &Database, relationship: WordRelationship) -> Vec<Word> {
+    fn relationship(
+        &self,
+        context: &Database,
+        relationship: WordRelationship,
+    ) -> Vec<Word> {
         use schema::wordrelation::dsl;
         match &mut context.conn() {
-            Ok(conn) => {
-                dsl::wordrelation
-                    .filter(dsl::wordsource.eq(self.norm.clone()))
-                    .filter(dsl::relationship.eq(relationship))
-                    .load::<WordRelation>(conn)
-                    .unwrap()
-                    .into_iter()
-                    .flat_map(|w| {
-                        use schema::words::dsl;
-                        dsl::words.find(w.wordtarget).first::<Word>(conn)
-                    })
-                    .collect::<Vec<Word>>()
-            },
+            Ok(conn) => dsl::wordrelation
+                .filter(dsl::wordsource.eq(self.norm.clone()))
+                .filter(dsl::relationship.eq(relationship))
+                .load::<WordRelation>(conn)
+                .unwrap()
+                .into_iter()
+                .flat_map(|w| {
+                    use schema::words::dsl;
+                    dsl::words.find(w.wordtarget).first::<Word>(conn)
+                })
+                .collect::<Vec<Word>>(),
             Err(e) => {
                 info!("Could not connect to database: {:?}", e);
                 Vec::new()
             }
         }
     }
-
 }
 
 #[juniper::graphql_object(Context = Database)]
@@ -98,16 +101,18 @@ impl Word {
         use schema::words::dsl;
         match self.lemma.clone() {
             Some(lemma) => match &mut context.conn() {
-                Ok(conn) => match dsl::words.find(lemma.clone()).first::<Word>(conn) {
-                    Ok(word) => Some(word),
-                    Err(e) => {
-                        info!(
-                            "Failed to retrieve lemma {} of word {}: {:?}",
-                            lemma, self.norm, e
-                        );
-                        None
+                Ok(conn) => {
+                    match dsl::words.find(lemma.clone()).first::<Word>(conn) {
+                        Ok(word) => Some(word),
+                        Err(e) => {
+                            info!(
+                                "Failed to retrieve lemma {} of word {}: {:?}",
+                                lemma, self.norm, e
+                            );
+                            None
+                        }
                     }
-                },
+                }
                 Err(e) => {
                     info!("Could not connect to the database: {:?}", e);
                     None
@@ -122,9 +127,7 @@ impl Word {
         use schema::languages::dsl;
         match &mut context.conn() {
             Ok(conn) => {
-                match dsl::languages
-                    .find(self.language.clone())
-                    .first::<Language>(conn)
+                match dsl::languages.find(self.language).first::<Language>(conn)
                 {
                     Ok(lang) => lang,
                     Err(e) => {
@@ -138,7 +141,10 @@ impl Word {
         }
     }
 
-    #[graphql(name = "partOfSpeech", description = "Part of speech the word belongs to")]
+    #[graphql(
+        name = "partOfSpeech",
+        description = "Part of speech the word belongs to"
+    )]
     fn part_of_speech(&self) -> PartOfSpeech {
         self.partofspeech.clone()
     }
@@ -168,18 +174,25 @@ impl Word {
         self.lusage.clone()
     }
 
-
-    #[graphql(description = "Morphology of the word, can be in Markdown format")]
+    #[graphql(
+        description = "Morphology of the word, can be in Markdown format"
+    )]
     fn morphology(&self) -> Option<String> {
         self.morphology.clone()
     }
 
-    #[graphql(name = "related", description = "Words related to the current word")]
+    #[graphql(
+        name = "related",
+        description = "Words related to the current word"
+    )]
     fn related_words(&self, context: &Database) -> Vec<Word> {
         self.relationship(context, WordRelationship::Related)
     }
 
-    #[graphql(name = "definitions", description = "Words that define the current word")]
+    #[graphql(
+        name = "definitions",
+        description = "Words that define the current word"
+    )]
     fn definitions(&self, context: &Database) -> Vec<Word> {
         self.relationship(context, WordRelationship::Definition)
     }

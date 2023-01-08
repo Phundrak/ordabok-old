@@ -119,7 +119,7 @@ impl Database {
         }
     }
 
-    pub fn words(&self, language: &str, word: &str) -> Vec<Word> {
+    pub fn words(&self, language: uuid::Uuid, word: &str) -> Vec<Word> {
         use self::schema::words::dsl;
         if let Ok(conn) = &mut self.conn() {
             match dsl::words

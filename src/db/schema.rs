@@ -29,8 +29,16 @@ diesel::table! {
     langandagents (id) {
         id -> Int4,
         agent -> Varchar,
-        language -> Varchar,
+        language -> Uuid,
         relationship -> Agentlanguagerelation,
+    }
+}
+
+diesel::table! {
+    langtranslatesto (id) {
+        id -> Int4,
+        langfrom -> Uuid,
+        langto -> Uuid,
     }
 }
 
@@ -39,11 +47,11 @@ diesel::table! {
     use super::sql_types::Release;
     use super::sql_types::Dictgenre;
 
-    languages (name) {
+    languages (id) {
+        id -> Uuid,
         name -> Varchar,
         native -> Nullable<Varchar>,
         release -> Release,
-        targetlanguage -> Array<Nullable<Text>>,
         genre -> Array<Nullable<Dictgenre>>,
         #[sql_name = "abstract"]
         abstract_ -> Nullable<Text>,
@@ -90,7 +98,7 @@ diesel::table! {
         norm -> Varchar,
         native -> Nullable<Varchar>,
         lemma -> Nullable<Varchar>,
-        language -> Varchar,
+        language -> Uuid,
         partofspeech -> Partofspeech,
         audio -> Nullable<Varchar>,
         video -> Nullable<Varchar>,
@@ -109,6 +117,7 @@ diesel::joinable!(words -> languages (language));
 
 diesel::allow_tables_to_appear_in_same_query!(
     langandagents,
+    langtranslatesto,
     languages,
     userfollows,
     users,

@@ -3,10 +3,12 @@ use diesel::prelude::*;
 use juniper::GraphQLEnum;
 use tracing::info;
 
+use uuid::Uuid;
+
 use super::super::schema;
 use super::users::User;
 
-use schema::{langandagents, languages};
+use schema::{langandagents, langtranslatesto, languages};
 
 #[derive(
     diesel_derive_enum::DbEnum, Debug, Clone, PartialEq, Eq, GraphQLEnum,
@@ -43,12 +45,12 @@ pub enum AgentLanguageRelation {
     Author,
 }
 
-#[derive(Queryable, Insertable, Debug, Clone, PartialEq, Eq)]
+#[derive(Queryable, Insertable, Debug, Clone)]
 pub struct Language {
+    id: Uuid,
     name: String,
     native: Option<String>,
     release: Release,
-    targetlanguage: Vec<Option<String>>,
     genre: Vec<Option<DictGenre>>,
     abstract_: Option<String>,
     created: chrono::NaiveDateTime,
@@ -67,7 +69,7 @@ impl Language {
         use schema::langandagents::dsl;
         match &mut context.conn() {
             Ok(conn) => dsl::langandagents
-                .filter(dsl::language.eq(self.name.clone()))
+                .filter(dsl::language.eq(self.id))
                 .filter(dsl::relationship.eq(relationship))
                 .load::<LangAndAgent>(conn)
                 .unwrap()
@@ -97,6 +99,11 @@ impl Language {
 
 #[juniper::graphql_object(Context = Database)]
 impl Language {
+    #[graphql(description = "Unique identifier of the language")]
+    fn id(&self) -> String {
+        self.id.to_string()
+    }
+
     #[graphql(
         description = "Name in the main target language (often English) of the described language"
     )]
@@ -119,23 +126,16 @@ impl Language {
         description = "Languages in which the current language is translated"
     )]
     fn target_language(&self, context: &Database) -> Vec<Language> {
-        use schema::languages::dsl;
+        use schema::langtranslatesto::dsl;
         match &mut context.conn() {
-            Ok(conn) => self
-                .targetlanguage
-                .clone()
+            Ok(conn) => dsl::langtranslatesto
+                .filter(dsl::langfrom.eq(self.id))
+                .load::<LangTranslatesTo>(conn)
+                .unwrap()
                 .into_iter()
-                .flatten()
-                .map(|l| dsl::languages.find(l).first::<Language>(conn))
-                .filter_map(|l| match l {
-                    Ok(language) => Some(language),
-                    Err(e) => {
-                        info!(
-                            "Failed to retrieve language from database: {:?}",
-                            e
-                        );
-                        None
-                    }
+                .flat_map(|l| {
+                    use schema::languages::dsl;
+                    dsl::languages.find(l.langto).first::<Language>(conn)
                 })
                 .collect::<Vec<Language>>(),
             Err(e) => {
@@ -223,6 +223,14 @@ impl Language {
 pub struct LangAndAgent {
     id: i32,
     agent: String,
-    language: String,
+    language: Uuid,
     relationship: AgentLanguageRelation,
+}
+
+#[derive(Queryable, Insertable, Debug, Clone, PartialEq, Eq)]
+#[diesel(table_name = langtranslatesto)]
+pub struct LangTranslatesTo {
+    id: i32,
+    langfrom: Uuid,
+    langto: Uuid,
 }

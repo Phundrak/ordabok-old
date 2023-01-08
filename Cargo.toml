@@ -16,9 +16,11 @@ publish = false
 dotenvy = "0.15"
 
 # Database
-diesel = { version = "2.0", features = ["postgres", "chrono", "r2d2"] }
+diesel = { version = "2.0.2", features = ["postgres", "chrono", "r2d2", "uuid"] }
 diesel-derive-enum = { version = "2.0.0-rc.0", features = ["postgres"] }
+# DB types
 chrono = "0.4.23"
+uuid = { version = "1.2.2", features = ["v4", "fast-rng", "macro-diagnostics", "serde"] }
 
 # Web server
 rocket = "0.5.0-rc.2"

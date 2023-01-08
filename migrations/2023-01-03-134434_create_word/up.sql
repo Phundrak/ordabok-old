@@ -9,8 +9,8 @@ CREATE TABLE Words (
     REFERENCES Words(norm)
     ON UPDATE CASCADE
     ON DELETE SET NULL,
-  language VARCHAR(255)
-    REFERENCES Languages(name)
+  language UUID
+    REFERENCES Languages(id)
     ON UPDATE CASCADE
     ON DELETE CASCADE
     NOT NULL,
