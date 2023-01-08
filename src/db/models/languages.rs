@@ -112,7 +112,7 @@ impl Language {
     }
 
     #[graphql(description = "Native name of the language")]
-    fn native() -> Option<String> {
+    fn native(&self) -> Option<String> {
         self.native.clone()
     }
 
