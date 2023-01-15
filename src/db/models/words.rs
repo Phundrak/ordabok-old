@@ -1,5 +1,5 @@
 use super::super::schema;
-use crate::db::Database;
+use crate::{db::Database, graphql::Context};
 use diesel::prelude::*;
 use juniper::GraphQLEnum;
 use schema::{wordrelation, words};
@@ -60,11 +60,11 @@ pub struct Word {
 impl Word {
     fn relationship(
         &self,
-        context: &Database,
+        db: &Database,
         relationship: WordRelationship,
     ) -> Vec<Word> {
         use schema::wordrelation::dsl;
-        match &mut context.conn() {
+        match &mut db.conn() {
             Ok(conn) => dsl::wordrelation
                 .filter(dsl::wordsource.eq(self.norm.clone()))
                 .filter(dsl::relationship.eq(relationship))
@@ -84,7 +84,7 @@ impl Word {
     }
 }
 
-#[juniper::graphql_object(Context = Database)]
+#[juniper::graphql_object(Context = Context)]
 impl Word {
     #[graphql(description = "Normal form of the word")]
     fn norm(&self) -> String {
@@ -97,10 +97,10 @@ impl Word {
     }
 
     #[graphql(description = "Base form of the current word")]
-    fn lemma(&self, context: &Database) -> Option<Word> {
+    fn lemma(&self, context: &Context) -> Option<Word> {
         use schema::words::dsl;
         match self.lemma.clone() {
-            Some(lemma) => match &mut context.conn() {
+            Some(lemma) => match &mut context.db.conn() {
                 Ok(conn) => {
                     match dsl::words.find(lemma.clone()).first::<Word>(conn) {
                         Ok(word) => Some(word),
@@ -123,9 +123,9 @@ impl Word {
     }
 
     #[graphql(description = "Language to which the word belongs")]
-    fn language(&self, context: &Database) -> Language {
+    fn language(&self, context: &Context) -> Language {
         use schema::languages::dsl;
-        match &mut context.conn() {
+        match &mut context.db.conn() {
             Ok(conn) => {
                 match dsl::languages.find(self.language).first::<Language>(conn)
                 {
@@ -185,16 +185,16 @@ impl Word {
         name = "related",
         description = "Words related to the current word"
     )]
-    fn related_words(&self, context: &Database) -> Vec<Word> {
-        self.relationship(context, WordRelationship::Related)
+    fn related_words(&self, context: &Context) -> Vec<Word> {
+        self.relationship(&context.db, WordRelationship::Related)
     }
 
     #[graphql(
         name = "definitions",
         description = "Words that define the current word"
     )]
-    fn definitions(&self, context: &Database) -> Vec<Word> {
-        self.relationship(context, WordRelationship::Definition)
+    fn definitions(&self, context: &Context) -> Vec<Word> {
+        self.relationship(&context.db, WordRelationship::Definition)
     }
 }
 

@@ -26,6 +26,9 @@ uuid = { version = "1.2.2", features = ["v4", "fast-rng", "macro-diagnostics", "
 rocket = "0.5.0-rc.2"
 rocket_cors = { git = "https://github.com/lawliet89/rocket_cors", rev = "c17e814" }
 
+# Web requests
+reqwest = { version = "0.11.13", features = ["serde_json", "json", "gzip"] }
+
 # GraphQL
 juniper = "0.15.10"
 juniper_rocket = "0.8.2"
@@ -33,3 +36,6 @@ juniper_rocket = "0.8.2"
 # logging
 tracing = "0.1.37"
 tracing-subscriber = "0.3.16"
+
+# Error handling
+color-eyre = "0.6.2"

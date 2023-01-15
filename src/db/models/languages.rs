@@ -1,4 +1,4 @@
-use crate::db::Database;
+use crate::{db::Database, graphql::Context};
 use diesel::prelude::*;
 use juniper::GraphQLEnum;
 use tracing::info;
@@ -63,11 +63,11 @@ pub struct Language {
 impl Language {
     fn relationship(
         &self,
-        context: &Database,
+        db: &Database,
         relationship: AgentLanguageRelation,
     ) -> Vec<User> {
         use schema::langandagents::dsl;
-        match &mut context.conn() {
+        match &mut db.conn() {
             Ok(conn) => dsl::langandagents
                 .filter(dsl::language.eq(self.id))
                 .filter(dsl::relationship.eq(relationship))
@@ -97,7 +97,7 @@ impl Language {
     }
 }
 
-#[juniper::graphql_object(Context = Database)]
+#[juniper::graphql_object(Context = Context)]
 impl Language {
     #[graphql(description = "Unique identifier of the language")]
     fn id(&self) -> String {
@@ -125,9 +125,9 @@ impl Language {
         name = "targetLanguage",
         description = "Languages in which the current language is translated"
     )]
-    fn target_language(&self, context: &Database) -> Vec<Language> {
+    fn target_language(&self, context: &Context) -> Vec<Language> {
         use schema::langtranslatesto::dsl;
-        match &mut context.conn() {
+        match &mut context.db.conn() {
             Ok(conn) => dsl::langtranslatesto
                 .filter(dsl::langfrom.eq(self.id))
                 .load::<LangTranslatesTo>(conn)
@@ -187,9 +187,9 @@ impl Language {
     #[graphql(
         description = "User with administrative rights over the language"
     )]
-    fn owner(&self, context: &Database) -> User {
+    fn owner(&self, context: &Context) -> User {
         use schema::users::dsl;
-        match &mut context.conn() {
+        match &mut context.db.conn() {
             Ok(conn) => dsl::users
                 .find(self.owner.clone())
                 .first::<User>(conn)
@@ -206,15 +206,15 @@ impl Language {
     #[graphql(
         description = "People who participate in the elaboration of the language's dictionary"
     )]
-    fn authors(&self, context: &Database) -> Vec<User> {
-        self.relationship(context, AgentLanguageRelation::Author)
+    fn authors(&self, context: &Context) -> Vec<User> {
+        self.relationship(&context.db, AgentLanguageRelation::Author)
     }
 
     #[graphql(
         description = "People who can and do redistribute the language's dictionary"
     )]
-    fn publishers(&self, context: &Database) -> Vec<User> {
-        self.relationship(context, AgentLanguageRelation::Publisher)
+    fn publishers(&self, context: &Context) -> Vec<User> {
+        self.relationship(&context.db, AgentLanguageRelation::Publisher)
     }
 }
 

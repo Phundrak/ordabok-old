@@ -1,15 +1,15 @@
 use super::super::schema::{userfollows, users};
 use diesel::prelude::*;
 
-use crate::db::Database;
+use crate::graphql::Context;
 
 #[derive(Queryable, Insertable, Debug, Clone, PartialEq, Eq)]
 pub struct User {
-    pub id: String,
-    pub username: String,
+    id: String,
+    username: String,
 }
 
-#[juniper::graphql_object(Context = Database)]
+#[juniper::graphql_object(Context = Context)]
 impl User {
     #[graphql(description = "Appwrite ID of the user")]
     pub fn id(&self) -> String {
@@ -22,9 +22,9 @@ impl User {
     }
 
     #[graphql(description = "Who the user follows")]
-    pub fn following(&self, context: &Database) -> Vec<User> {
+    pub fn following(&self, context: &Context) -> Vec<User> {
         use super::super::schema::{userfollows, users};
-        let conn = &mut context.conn().unwrap();
+        let conn = &mut context.db.conn().unwrap();
         userfollows::dsl::userfollows
             .filter(userfollows::dsl::follower.eq(self.id.clone()))
             .load::<UserFollow>(conn)

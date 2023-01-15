@@ -1,5 +1,6 @@
 #![warn(clippy::style, clippy::pedantic)]
 
+mod appwrite;
 mod db;
 mod graphql;
 
@@ -49,6 +50,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
         create_schema, get_graphql_handler, graphiql, post_graphql_handler,
     };
 
+    color_eyre::install()?;
     setup_logging();
 
     info!("Reading environment variables");
@@ -60,7 +62,7 @@ async fn main() -> Result<(), Box<dyn Error>> {
     #[allow(clippy::let_underscore_drop, clippy::no_effect_underscore_binding)]
     let _ = rocket::build()
         .attach(cors)
-        .manage(db::Database::default())
+        .manage(graphql::Context::default())
         .manage(create_schema())
         .mount(
             "/",

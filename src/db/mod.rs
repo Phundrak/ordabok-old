@@ -29,6 +29,7 @@ macro_rules! find_element {
 
 use diesel::prelude::*;
 
+#[derive(Debug)]
 pub struct Database {
     conn: Pool<ConnectionManager<PgConnection>>,
 }
