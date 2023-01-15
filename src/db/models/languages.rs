@@ -1,12 +1,17 @@
-use crate::{db::Database, graphql::Context};
+use crate::{
+    db::{Database, DatabaseError},
+    graphql::Context,
+};
 use diesel::prelude::*;
-use juniper::GraphQLEnum;
+use juniper::{FieldResult, GraphQLEnum};
 use tracing::info;
 
 use uuid::Uuid;
 
 use super::super::schema;
 use super::users::User;
+
+use std::convert::Into;
 
 use schema::{langandagents, langtranslatesto, languages};
 
@@ -65,14 +70,22 @@ impl Language {
         &self,
         db: &Database,
         relationship: AgentLanguageRelation,
-    ) -> Vec<User> {
+    ) -> Result<Vec<User>, DatabaseError> {
         use schema::langandagents::dsl;
         match &mut db.conn() {
-            Ok(conn) => dsl::langandagents
+            Ok(conn) => Ok(dsl::langandagents
                 .filter(dsl::language.eq(self.id))
                 .filter(dsl::relationship.eq(relationship))
                 .load::<LangAndAgent>(conn)
-                .unwrap()
+                .map_err(|e| {
+                    DatabaseError::new(
+                        format!(
+                            "Failed to retrieve language relationship: {:?}",
+                            e
+                        ),
+                        "Database reading error",
+                    )
+                })?
                 .iter()
                 .map(|v| {
                     use schema::users::dsl;
@@ -89,7 +102,7 @@ impl Language {
                         None
                     }
                 })
-                .collect::<Vec<User>>(),
+                .collect::<Vec<User>>()),
             Err(e) => {
                 panic!("Could not connect to the database: {:?}", e);
             }
@@ -125,23 +138,32 @@ impl Language {
         name = "targetLanguage",
         description = "Languages in which the current language is translated"
     )]
-    fn target_language(&self, context: &Context) -> Vec<Language> {
+    fn target_language(&self, context: &Context) -> FieldResult<Vec<Language>> {
         use schema::langtranslatesto::dsl;
         match &mut context.db.conn() {
-            Ok(conn) => dsl::langtranslatesto
+            Ok(conn) => Ok(dsl::langtranslatesto
                 .filter(dsl::langfrom.eq(self.id))
                 .load::<LangTranslatesTo>(conn)
-                .unwrap()
+                .map_err(|e| {
+                    DatabaseError::new(
+                        format!(
+                            "Failed to retrieve language translations: {:?}",
+                            e
+                        ),
+                        "Database reading failure",
+                    )
+                })?
                 .into_iter()
                 .flat_map(|l| {
                     use schema::languages::dsl;
                     dsl::languages.find(l.langto).first::<Language>(conn)
                 })
-                .collect::<Vec<Language>>(),
-            Err(e) => {
-                info!("Failed to connect to the database: {:?}", e);
-                Vec::new()
-            }
+                .collect::<Vec<Language>>()),
+            Err(e) => Err(DatabaseError::new(
+                format!("Failed to connect to the database: {:?}", e),
+                "Database connection failure",
+            )
+            .into()),
         }
     }
 
@@ -187,34 +209,43 @@ impl Language {
     #[graphql(
         description = "User with administrative rights over the language"
     )]
-    fn owner(&self, context: &Context) -> User {
+    fn owner(&self, context: &Context) -> FieldResult<User> {
         use schema::users::dsl;
         match &mut context.db.conn() {
-            Ok(conn) => dsl::users
+            Ok(conn) => Ok(dsl::users
                 .find(self.owner.clone())
                 .first::<User>(conn)
-                .unwrap_or_else(|e| {
-                    panic!(
-                        "Failed to retrieve owner {} of language {}: {:?}",
-                        self.owner, self.name, e
+                .map_err(|e| {
+                    DatabaseError::new(
+                        format!(
+                            "Failed to retrieve owner {} of language {}: {:?}",
+                            self.owner, self.name, e
+                        ),
+                        "Database reading error",
                     )
-                }),
-            Err(e) => panic!("Failed to connect to the database: {:?}", e),
+                })?),
+            Err(e) => Err(DatabaseError::new(
+                format!("Failed to connect to the database: {:?}", e),
+                "Database connection failure",
+            )
+            .into()),
         }
     }
 
     #[graphql(
         description = "People who participate in the elaboration of the language's dictionary"
     )]
-    fn authors(&self, context: &Context) -> Vec<User> {
+    fn authors(&self, context: &Context) -> FieldResult<Vec<User>> {
         self.relationship(&context.db, AgentLanguageRelation::Author)
+            .map_err(Into::into)
     }
 
     #[graphql(
         description = "People who can and do redistribute the language's dictionary"
     )]
-    fn publishers(&self, context: &Context) -> Vec<User> {
+    fn publishers(&self, context: &Context) -> FieldResult<Vec<User>> {
         self.relationship(&context.db, AgentLanguageRelation::Publisher)
+            .map_err(Into::into)
     }
 }
 

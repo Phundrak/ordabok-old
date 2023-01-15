@@ -18,7 +18,7 @@ pub struct OtherEnvVar {
 impl Default for OtherEnvVar {
     fn default() -> Self {
         Self {
-            admin_key: from_env!("ADMIN_KEY")
+            admin_key: from_env!("ADMIN_KEY"),
         }
     }
 }
@@ -28,7 +28,7 @@ pub struct Context {
     pub db: Database,
     pub appwrite: APVariables,
     pub user_auth: bool,
-    pub other_vars: OtherEnvVar
+    pub other_vars: OtherEnvVar,
 }
 
 impl Context {
@@ -64,7 +64,6 @@ impl Context {
         res.user_auth = self.user_auth(auth_token).await;
         res
     }
-
 }
 
 impl juniper::Context for Context {}

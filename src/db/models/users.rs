@@ -1,7 +1,9 @@
 use super::super::schema::{userfollows, users};
 use diesel::prelude::*;
+use juniper::FieldResult;
+use tracing::debug;
 
-use crate::graphql::Context;
+use crate::{db::DatabaseError, graphql::Context};
 
 #[derive(Queryable, Insertable, Debug, Clone, PartialEq, Eq)]
 pub struct User {
@@ -22,21 +24,45 @@ impl User {
     }
 
     #[graphql(description = "Who the user follows")]
-    pub fn following(&self, context: &Context) -> Vec<User> {
+    pub fn following(&self, context: &Context) -> FieldResult<Vec<User>> {
         use super::super::schema::{userfollows, users};
-        let conn = &mut context.db.conn().unwrap();
-        userfollows::dsl::userfollows
+        let conn = &mut context.db.conn().map_err(|e| {
+            DatabaseError::new(
+                format!("Failed to connect to database: {:?}", e),
+                "Database connection error",
+            )
+        })?;
+        Ok(userfollows::dsl::userfollows
             .filter(userfollows::dsl::follower.eq(self.id.clone()))
             .load::<UserFollow>(conn)
-            .unwrap()
-            .iter()
-            .map(|f| {
-                users::dsl::users
-                    .find(f.following.clone())
-                    .first::<User>(conn)
-                    .unwrap()
-            })
-            .collect::<Vec<User>>()
+           .map_err(|e| {
+                DatabaseError::new(
+                    format!(
+                        "Failed to retrieve user follows from database: {:?}",
+                        e
+                    ),
+                    "Database reading error",
+                )
+            })?
+           .iter()
+           .filter_map(|f| {
+               match users::dsl::users
+                .find(f.following.clone())
+                .first::<User>(conn) {
+                    Ok(val) => Some(val),
+                    Err(e) => {
+                        let err = DatabaseError::new(
+                            format!("Failed to retrieve user {} from database: {:?}",
+                                    f.following.clone(),
+                                    e),
+                            "Database reading error");
+                        debug!("{}", err);
+                        None
+                    }
+                }
+
+           })
+           .collect::<Vec<User>>())
     }
 }
 
