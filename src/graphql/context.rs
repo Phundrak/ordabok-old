@@ -3,11 +3,32 @@ use crate::db::Database;
 
 use tracing::info;
 
+macro_rules! from_env {
+    ($varname:expr) => {
+        std::env::var($varname)
+            .expect(format!("{} must be set!", $varname).as_str())
+    };
+}
+
+#[derive(Debug, Clone)]
+pub struct OtherEnvVar {
+    pub admin_key: String,
+}
+
+impl Default for OtherEnvVar {
+    fn default() -> Self {
+        Self {
+            admin_key: from_env!("ADMIN_KEY")
+        }
+    }
+}
+
 #[derive(Default, Debug, Clone)]
 pub struct Context {
     pub db: Database,
     pub appwrite: APVariables,
     pub user_auth: bool,
+    pub other_vars: OtherEnvVar
 }
 
 impl Context {
