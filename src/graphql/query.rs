@@ -1,7 +1,11 @@
+use juniper::FieldResult;
+
 use super::Context;
-use crate::db::models::{languages::Language, users::User, words::Word};
+use crate::db::{models::{languages::Language, users::User, words::Word}, DatabaseError};
 
 use std::str::FromStr;
+
+use std::convert::Into;
 
 #[derive(Debug)]
 pub struct Query;
@@ -14,6 +18,14 @@ impl Query {
     )]
     fn all_languages(context: &Context) -> Vec<Language> {
         context.db.all_languages().unwrap()
+    }
+
+    fn all_users(context: &Context, admin_key: String) -> FieldResult<Vec<User>> {
+        if admin_key == context.other_vars.admin_key {
+            context.db.all_users().map_err(Into::into)
+        } else {
+            Err(DatabaseError::new("Invalid admin key", "Invalid admin key").into())
+        }
     }
 
     #[graphql(

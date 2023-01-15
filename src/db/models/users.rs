@@ -5,8 +5,8 @@ use crate::graphql::Context;
 
 #[derive(Queryable, Insertable, Debug, Clone, PartialEq, Eq)]
 pub struct User {
-    id: String,
-    username: String,
+    pub id: String,
+    pub username: String,
 }
 
 #[juniper::graphql_object(Context = Context)]

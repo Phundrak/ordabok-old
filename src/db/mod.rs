@@ -4,11 +4,52 @@ pub mod schema;
 use self::models::languages::Language;
 use self::models::users::User;
 use self::models::words::Word;
+
 use diesel::pg::PgConnection;
 use diesel::r2d2::{ConnectionManager, Pool, PooledConnection};
+use diesel::{insert_into, prelude::*};
+
 use dotenvy::dotenv;
+use juniper::{graphql_value, DefaultScalarValue, FieldError, IntoFieldError};
 use std::env;
+use std::error::Error;
 use tracing::info;
+
+#[derive(Debug)]
+pub struct DatabaseError {
+    long: String,
+    short: String,
+}
+
+impl DatabaseError {
+    pub fn new<S, T>(long: S, short: T) -> Self
+    where
+        T: ToString,
+        S: ToString,
+    {
+        Self {
+            long: long.to_string(),
+            short: short.to_string(),
+        }
+    }
+}
+
+impl Error for DatabaseError {}
+
+impl std::fmt::Display for DatabaseError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.long)
+    }
+}
+
+impl IntoFieldError for DatabaseError {
+    fn into_field_error(self) -> juniper::FieldError<DefaultScalarValue> {
+        FieldError::new(
+            self.long,
+            graphql_value!({ "error": "Connection refused" }),
+        )
+    }
+}
 
 macro_rules! find_element {
     ($conn:expr,$dsl:ident,$type:ty,$value:expr,$errmsg:expr) => {
@@ -26,8 +67,6 @@ macro_rules! find_element {
         }
     };
 }
-
-use diesel::prelude::*;
 
 #[derive(Debug, Clone)]
 pub struct Database {
@@ -59,17 +98,44 @@ impl Database {
 
     fn conn(
         &self,
-    ) -> Result<PooledConnection<ConnectionManager<PgConnection>>, ()> {
-        self.conn
-            .get()
-            .map_err(|e| info!("Failed to connect to database: {:?}", e))
+    ) -> Result<PooledConnection<ConnectionManager<PgConnection>>, DatabaseError>
+    {
+        self.conn.get().map_err(|e| {
+            DatabaseError::new(
+                format!("Failed to connect to database: {:?}", e),
+                "Database connection error",
+            )
+        })
     }
 
-    pub fn all_languages(&self) -> Result<Vec<Language>, ()> {
+    pub fn all_languages(&self) -> Result<Vec<Language>, DatabaseError> {
         use self::schema::languages::dsl::languages;
-        languages.load::<Language>(&mut self.conn()?).map_err(|e| {
-            info!("Failed to retrieve languages from database: {:?}", e);
-        })
+        languages
+            .load::<Language>(&mut self.conn()?)
+            .map_err(|e| {
+                info!("Failed to retrieve languages from database: {:?}", e);
+            })
+            .map_err(|e| {
+                DatabaseError::new(
+                    format!("Failed to retrieve languages: {:?}", e),
+                    "Failed to retrieve languages",
+                )
+            })
+    }
+
+    pub fn all_users(&self) -> Result<Vec<User>, DatabaseError> {
+        use self::schema::users::dsl::users;
+        users
+            .load::<User>(&mut self.conn()?)
+            .map_err(|e| {
+                info!("Failed to retrieve languages from database: {:?}", e);
+            })
+            .map_err(|e| {
+                DatabaseError::new(
+                    format!("Failed to retrieve languages: {:?}", e),
+                    "Failed to retrieve languages",
+                )
+            })
     }
 
     pub fn language(&self, name: &str, owner: &str) -> Option<Language> {
@@ -103,6 +169,42 @@ impl Database {
             id.to_string(),
             format!("Failed to retrieve user {} from database", id)
         )
+    }
+
+    pub fn insert_user(
+        &self,
+        username: String,
+        id: String,
+    ) -> Result<User, DatabaseError> {
+        use self::schema::users::dsl::users;
+        let user = User { id, username };
+        match insert_into(users).values(user.clone()).execute(
+            &mut self.conn().map_err(|e| {
+                DatabaseError::new(
+                    format!("Failed to connect to the database: {:?}", e),
+                    "Connection error",
+                )
+            })?,
+        ) {
+            Ok(_) => Ok(user),
+            Err(e) => Err(DatabaseError {
+                long: format!("Failed to insert user {:?}: {:?}", user, e),
+                short: "Data insertion error".to_string(),
+            }),
+        }
+    }
+
+    pub fn delete_user(&self, id: &str) -> Result<(), DatabaseError> {
+        use self::schema::users::dsl::users;
+        match diesel::delete(users.find(id.to_string()))
+            .execute(&mut self.conn()?)
+        {
+            Ok(_) => Ok(()),
+            Err(e) => Err(DatabaseError::new(
+                format!("Failed to delete user {}: {:?}", id, e),
+                "User deletion error",
+            )),
+        }
     }
 
     pub fn word_id(&self, id: &str) -> Option<Word> {
