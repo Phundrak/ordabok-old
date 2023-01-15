@@ -18,8 +18,8 @@ pub struct APVariables {
 impl APVariables {
     pub async fn check_session(
         &self,
-        session_id: String,
-        user_id: String,
+        session_id: &str,
+        user_id: &str,
     ) -> Result<bool> {
         let client = reqwest::Client::new();
         let url = format!("{}/users/{}/sessions", self.endpoint, user_id);
