@@ -1,9 +1,14 @@
 use super::super::schema;
-use crate::{db::Database, graphql::Context};
+use crate::{
+    db::{Database, DatabaseError},
+    graphql::Context,
+};
 use diesel::prelude::*;
-use juniper::GraphQLEnum;
+use juniper::{FieldResult, GraphQLEnum};
 use schema::{wordrelation, words};
 use tracing::info;
+
+use std::convert::Into;
 
 use super::languages::Language;
 
@@ -62,24 +67,29 @@ impl Word {
         &self,
         db: &Database,
         relationship: WordRelationship,
-    ) -> Vec<Word> {
+    ) -> Result<Vec<Word>, DatabaseError> {
         use schema::wordrelation::dsl;
         match &mut db.conn() {
-            Ok(conn) => dsl::wordrelation
+            Ok(conn) => Ok(dsl::wordrelation
                 .filter(dsl::wordsource.eq(self.norm.clone()))
                 .filter(dsl::relationship.eq(relationship))
                 .load::<WordRelation>(conn)
-                .unwrap()
+                .map_err(|e| {
+                    DatabaseError::new(
+                        format!("Failed to retrieve word relations: {:?}", e),
+                        "Database reading failed",
+                    )
+                })?
                 .into_iter()
                 .flat_map(|w| {
                     use schema::words::dsl;
                     dsl::words.find(w.wordtarget).first::<Word>(conn)
                 })
-                .collect::<Vec<Word>>(),
-            Err(e) => {
-                info!("Could not connect to database: {:?}", e);
-                Vec::new()
-            }
+                .collect::<Vec<Word>>()),
+            Err(e) => Err(DatabaseError::new(
+                format!("Failed to connect to the database: {:?}", e),
+                "Database connection error",
+            )),
         }
     }
 }
@@ -185,16 +195,18 @@ impl Word {
         name = "related",
         description = "Words related to the current word"
     )]
-    fn related_words(&self, context: &Context) -> Vec<Word> {
+    fn related_words(&self, context: &Context) -> FieldResult<Vec<Word>> {
         self.relationship(&context.db, WordRelationship::Related)
+            .map_err(Into::into)
     }
 
     #[graphql(
         name = "definitions",
         description = "Words that define the current word"
     )]
-    fn definitions(&self, context: &Context) -> Vec<Word> {
+    fn definitions(&self, context: &Context) -> FieldResult<Vec<Word>> {
         self.relationship(&context.db, WordRelationship::Definition)
+            .map_err(Into::into)
     }
 }
 

@@ -18,10 +18,12 @@ use tracing::info;
 #[derive(Debug)]
 pub struct DatabaseError {
     long: String,
+    #[allow(dead_code)]
     short: String,
 }
 
 impl DatabaseError {
+    #[allow(clippy::needless_pass_by_value)]
     pub fn new<S, T>(long: S, short: T) -> Self
     where
         T: ToString,

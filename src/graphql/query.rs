@@ -1,7 +1,10 @@
 use juniper::FieldResult;
 
 use super::Context;
-use crate::db::{models::{languages::Language, users::User, words::Word}, DatabaseError};
+use crate::db::{
+    models::{languages::Language, users::User, words::Word},
+    DatabaseError,
+};
 
 use std::str::FromStr;
 
@@ -16,15 +19,19 @@ impl Query {
         name = "allLanguages",
         description = "Retrieve all languages defined in the database"
     )]
-    fn all_languages(context: &Context) -> Vec<Language> {
-        context.db.all_languages().unwrap()
+    fn all_languages(context: &Context) -> FieldResult<Vec<Language>> {
+        context.db.all_languages().map_err(Into::into)
     }
 
-    fn all_users(context: &Context, admin_key: String) -> FieldResult<Vec<User>> {
+    fn all_users(
+        context: &Context,
+        admin_key: String,
+    ) -> FieldResult<Vec<User>> {
         if admin_key == context.other_vars.admin_key {
             context.db.all_users().map_err(Into::into)
         } else {
-            Err(DatabaseError::new("Invalid admin key", "Invalid admin key").into())
+            Err(DatabaseError::new("Invalid admin key", "Invalid admin key")
+                .into())
         }
     }
 
@@ -69,9 +76,21 @@ impl Query {
             word(description = "Word to search")
         )
     )]
-    fn words(context: &Context, language: String, word: String) -> Vec<Word> {
-        context
-            .db
-            .words(uuid::Uuid::from_str(&language).unwrap(), word.as_str())
+    fn words(
+        context: &Context,
+        language: String,
+        word: String,
+    ) -> FieldResult<Vec<Word>> {
+        match uuid::Uuid::from_str(&language) {
+            Ok(uuid) => Ok(context.db.words(uuid, word.as_str())),
+            Err(e) => Err(DatabaseError::new(
+                format!(
+                    "Failed to convert {} to a proper UUID: {:?}",
+                    language, e
+                ),
+                "Conversion Error",
+            )
+            .into()),
+        }
     }
 }
