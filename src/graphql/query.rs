@@ -1,4 +1,5 @@
 use juniper::FieldResult;
+use uuid::Uuid;
 
 use super::Context;
 use crate::db::{
@@ -23,6 +24,26 @@ impl Query {
         context.db.all_languages().map_err(Into::into)
     }
 
+    #[graphql(
+        name = "findLanguage",
+        description = "Find languages by username containing query",
+        arguments(query(description = "String to find in language name"))
+    )]
+    fn find_language(
+        context: &Context,
+        query: String,
+    ) -> FieldResult<Vec<Language>> {
+        context.db.find_language(query.as_str()).map_err(Into::into)
+    }
+
+    #[graphql(
+        name = "allUsers",
+        description = "Fetch all users from database",
+        arguments(admin_key(
+            name = "adminKey",
+            description = "Administrator key. Without it, the query cannot be executed"
+        ))
+    )]
     fn all_users(
         context: &Context,
         admin_key: String,
@@ -33,6 +54,15 @@ impl Query {
             Err(DatabaseError::new("Invalid admin key", "Invalid admin key")
                 .into())
         }
+    }
+
+    #[graphql(
+        name = "findUser",
+        description = "Find users by username containing query",
+        arguments(query(description = "String to find in usernames"))
+    )]
+    fn find_user(context: &Context, query: String) -> FieldResult<Vec<User>> {
+        context.db.find_user(query.as_str()).map_err(Into::into)
     }
 
     #[graphql(
@@ -67,6 +97,34 @@ impl Query {
     }
 
     #[graphql(
+        name = "findWord",
+        description = "Retrieve a word from a specific language",
+        arguments(
+            language(
+                description = "UUID of the language to look the word for in"
+            ),
+            query(description = "String to find in the word")
+        )
+    )]
+    fn find_word(
+        context: &Context,
+        language: String,
+        query: String,
+    ) -> FieldResult<Vec<Word>> {
+        match Uuid::from_str(&language) {
+            Ok(uuid) => context
+                .db
+                .find_word(uuid, query.as_str())
+                .map_err(Into::into),
+            Err(e) => Err(DatabaseError::new(
+                format!("Failed to convert {} to a UUID: {:?}", language, e),
+                "Conversion Error",
+            )
+            .into()),
+        }
+    }
+
+    #[graphql(
         description = "Retrieve all words with a set normal form from a set language",
         arguments(
             owner(
@@ -81,13 +139,13 @@ impl Query {
         language: String,
         word: String,
     ) -> FieldResult<Vec<Word>> {
-        match uuid::Uuid::from_str(&language) {
-            Ok(uuid) => Ok(context.db.words(uuid, word.as_str())),
+        match Uuid::from_str(&language) {
+            Ok(uuid) => context
+                .db
+                .words(uuid, word.as_str())
+                .map_err(Into::into),
             Err(e) => Err(DatabaseError::new(
-                format!(
-                    "Failed to convert {} to a proper UUID: {:?}",
-                    language, e
-                ),
+                format!("Failed to convert {} to a UUID: {:?}", language, e),
                 "Conversion Error",
             )
             .into()),

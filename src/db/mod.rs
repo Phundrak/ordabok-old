@@ -127,14 +127,44 @@ impl Database {
 
     pub fn all_users(&self) -> Result<Vec<User>, DatabaseError> {
         use self::schema::users::dsl::users;
-        users
-            .load::<User>(&mut self.conn()?)
-            .map_err(|e| {
-                info!("Failed to retrieve languages from database: {:?}", e);
-            })
+        users.load::<User>(&mut self.conn()?).map_err(|e| {
+            DatabaseError::new(
+                format!("Failed to retrieve languages: {:?}", e),
+                "Failed to retrieve languages",
+            )
+        })
+    }
+
+    pub fn find_language(
+        &self,
+        query: &str,
+    ) -> Result<Vec<Language>, DatabaseError> {
+        use self::schema::languages::dsl;
+        dsl::languages
+            .filter(dsl::name.ilike(format!("%{}%", query)))
+            .load::<Language>(&mut self.conn()?)
             .map_err(|e| {
                 DatabaseError::new(
-                    format!("Failed to retrieve languages: {:?}", e),
+                    format!(
+                        "Failed to retrieve languages with query {}: {:?}",
+                        query, e
+                    ),
+                    "Failed to retrieve languages",
+                )
+            })
+    }
+
+    pub fn find_user(&self, query: &str) -> Result<Vec<User>, DatabaseError> {
+        use self::schema::users::dsl;
+        dsl::users
+            .filter(dsl::username.ilike(format!("%{}%", query)))
+            .load::<User>(&mut self.conn()?)
+            .map_err(|e| {
+                DatabaseError::new(
+                    format!(
+                        "Failed to retrieve users with query {}: {:?}",
+                        query, e
+                    ),
                     "Failed to retrieve languages",
                 )
             })
@@ -224,25 +254,46 @@ impl Database {
         }
     }
 
-    pub fn words(&self, language: uuid::Uuid, word: &str) -> Vec<Word> {
+    pub fn words(
+        &self,
+        language: uuid::Uuid,
+        word: &str,
+    ) -> Result<Vec<Word>, DatabaseError> {
         use self::schema::words::dsl;
-        if let Ok(conn) = &mut self.conn() {
-            match dsl::words
-                .filter(dsl::language.eq(language))
-                .filter(dsl::norm.eq(word))
-                .load::<Word>(conn)
-            {
-                Ok(val) => val,
-                Err(e) => {
-                    info!(
-                        "Error retrieving {} from language {}: {:?}",
+        dsl::words
+            .filter(dsl::language.eq(language))
+            .filter(dsl::norm.eq(word))
+            .load::<Word>(&mut self.conn()?)
+            .map_err(|e| {
+                DatabaseError::new(
+                    format!(
+                        "Failed to retrieve word {} from language {}: {:?}",
                         word, language, e
-                    );
-                    Vec::new()
-                }
-            }
-        } else {
-            Vec::new()
-        }
+                    ),
+                    "Failed to retrieve languages",
+                )
+            })
+    }
+
+    pub fn find_word(
+        &self,
+        language: uuid::Uuid,
+        query: &str,
+    ) -> Result<Vec<Word>, DatabaseError> {
+        use self::schema::words::dsl;
+        dsl::words
+            .filter(dsl::language.eq(language))
+            .filter(dsl::norm.ilike(format!("%{}%", query)))
+            .load::<Word>(&mut self.conn()?)
+            .map_err(|e| {
+                DatabaseError::new(
+                    format!(
+                        "Failed to retrieve words from language {} with query {}: {:?}",
+                        language,
+                        query, e
+                    ),
+                    "Failed to retrieve languages",
+                )
+            })
     }
 }
