@@ -7,12 +7,12 @@ use self::models::words::Word;
 
 use diesel::pg::PgConnection;
 use diesel::r2d2::{ConnectionManager, Pool, PooledConnection};
+use diesel::result::Error;
 use diesel::{insert_into, prelude::*};
 
 use dotenvy::dotenv;
 use juniper::{graphql_value, DefaultScalarValue, FieldError, IntoFieldError};
 use std::env;
-use std::error::Error;
 use tracing::info;
 
 #[derive(Debug)]
@@ -36,7 +36,7 @@ impl DatabaseError {
     }
 }
 
-impl Error for DatabaseError {}
+impl std::error::Error for DatabaseError {}
 
 impl std::fmt::Display for DatabaseError {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -51,23 +51,6 @@ impl IntoFieldError for DatabaseError {
             graphql_value!({ "error": "Connection refused" }),
         )
     }
-}
-
-macro_rules! find_element {
-    ($conn:expr,$dsl:ident,$type:ty,$value:expr,$errmsg:expr) => {
-        if let Ok(val) = $conn {
-            $dsl.find($value).first::<$type>(val).map_or_else(
-                |e| {
-                    info!("{}: {:?}", $errmsg, e);
-                    None
-                },
-                Some,
-            )
-        } else {
-            info!("Failed to obtain connection for the database");
-            None
-        }
-    };
 }
 
 #[derive(Debug, Clone)]
@@ -170,37 +153,42 @@ impl Database {
             })
     }
 
-    pub fn language(&self, name: &str, owner: &str) -> Option<Language> {
+    pub fn language(
+        &self,
+        name: &str,
+        owner: &str,
+    ) -> Result<Option<Language>, DatabaseError> {
         use self::schema::languages::dsl;
-        match &mut self.conn() {
-            Ok(conn) => match dsl::languages
-                .filter(dsl::name.eq(name))
-                .filter(dsl::owner.eq(owner))
-                .first::<Language>(conn)
-            {
-                Ok(val) => Some(val),
-                Err(e) => {
-                    info!("Could not retrieve language {} of user {} from database: {:?}",
-                          name, owner, e);
-                    None
-                }
-            },
-            Err(e) => {
-                info!("Could not connect to the database: {:?}", e);
-                None
-            }
+        match dsl::languages
+            .filter(dsl::name.eq(name))
+            .filter(dsl::owner.eq(owner))
+            .first(&mut self.conn()?)
+        {
+            Ok(val) => Ok(Some(val)),
+            Err(Error::NotFound) => Ok(None),
+            Err(e) => Err(DatabaseError::new(
+                format!(
+                    "Failed to find language {} belonging to {}: {:?}",
+                    name, owner, e
+                ),
+                "Database error",
+            )),
         }
     }
 
-    pub fn user(&self, id: &str) -> Option<User> {
+    pub fn user(&self, id: &str) -> Result<Option<User>, DatabaseError> {
         use self::schema::users::dsl::users;
-        find_element!(
-            &mut self.conn(),
-            users,
-            User,
-            id.to_string(),
-            format!("Failed to retrieve user {} from database", id)
-        )
+        match users.find(id).first::<User>(&mut self.conn()?) {
+            Ok(val) => Ok(Some(val)),
+            Err(Error::NotFound) => Ok(None),
+            Err(e) => Err(DatabaseError::new(
+                format!(
+                    "Failed to retrieve user {} from database: {:?}",
+                    id, e
+                ),
+                "Database Error",
+            )),
+        }
     }
 
     pub fn insert_user(
@@ -239,18 +227,18 @@ impl Database {
         }
     }
 
-    pub fn word_id(&self, id: &str) -> Option<Word> {
+    pub fn word_id(&self, id: &str) -> Result<Option<Word>, DatabaseError> {
         use self::schema::words::dsl;
-        if let Ok(conn) = &mut self.conn() {
-            match dsl::words.find(id).first::<Word>(conn) {
-                Ok(val) => Some(val),
-                Err(e) => {
-                    info!("Error retrieving {}: {:?}", id, e);
-                    None
-                }
-            }
-        } else {
-            None
+        match dsl::words.find(id).first::<Word>(&mut self.conn()?) {
+            Ok(val) => Ok(Some(val)),
+            Err(Error::NotFound) => Ok(None),
+            Err(e) => Err(DatabaseError::new(
+                format!(
+                    "Failed to retrieve word {} from database: {:?}",
+                    id, e
+                ),
+                "Database Error",
+            )),
         }
     }
 

@@ -76,24 +76,27 @@ impl Query {
         context: &Context,
         name: String,
         owner: String,
-    ) -> Option<Language> {
-        context.db.language(name.as_str(), owner.as_str())
+    ) -> FieldResult<Option<Language>> {
+        context
+            .db
+            .language(name.as_str(), owner.as_str())
+            .map_err(Into::into)
     }
 
     #[graphql(
         description = "Retrieve a specific user from its id",
         arguments(id(description = "Appwrite ID of a user"))
     )]
-    fn user(context: &Context, id: String) -> Option<User> {
-        context.db.user(id.as_str())
+    fn user(context: &Context, id: String) -> FieldResult<Option<User>> {
+        context.db.user(id.as_str()).map_err(Into::into)
     }
 
     #[graphql(
         description = "Retrieve a specific word from its id",
         arguments(id(description = "Unique identifier of a word"))
     )]
-    fn word(context: &Context, id: String) -> Option<Word> {
-        context.db.word_id(id.as_str())
+    fn word(context: &Context, id: String) -> FieldResult<Option<Word>> {
+        context.db.word_id(id.as_str()).map_err(Into::into)
     }
 
     #[graphql(
@@ -140,10 +143,9 @@ impl Query {
         word: String,
     ) -> FieldResult<Vec<Word>> {
         match Uuid::from_str(&language) {
-            Ok(uuid) => context
-                .db
-                .words(uuid, word.as_str())
-                .map_err(Into::into),
+            Ok(uuid) => {
+                context.db.words(uuid, word.as_str()).map_err(Into::into)
+            }
             Err(e) => Err(DatabaseError::new(
                 format!("Failed to convert {} to a UUID: {:?}", language, e),
                 "Conversion Error",
