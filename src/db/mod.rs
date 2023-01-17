@@ -46,9 +46,10 @@ impl std::fmt::Display for DatabaseError {
 
 impl IntoFieldError for DatabaseError {
     fn into_field_error(self) -> juniper::FieldError<DefaultScalarValue> {
+        let short = self.short;
         FieldError::new(
             self.long,
-            graphql_value!({ "error": "Connection refused" }),
+            graphql_value!({ "error": short }),
         )
     }
 }
