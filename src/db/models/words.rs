@@ -133,22 +133,19 @@ impl Word {
     }
 
     #[graphql(description = "Language to which the word belongs")]
-    fn language(&self, context: &Context) -> Language {
+    fn language(&self, context: &Context) -> FieldResult<Language> {
         use schema::languages::dsl;
-        match &mut context.db.conn() {
-            Ok(conn) => {
-                match dsl::languages.find(self.language).first::<Language>(conn)
-                {
-                    Ok(lang) => lang,
-                    Err(e) => {
-                        panic!("Failed to retrieve language {} of word {} from database: {:?}",
-                               self.language, self.norm, e
-                        )
-                    }
-                }
-            }
-            Err(e) => panic!("Failed to connect to database: {:?}", e),
-        }
+        use std::convert::Into;
+        dsl::languages
+            .find(self.language)
+            .first::<Language>(&mut context.db.conn()?)
+            .map_err(|e| DatabaseError::new(
+                format!(
+                    "Failed to retrieve language {} of word {} from database: {e:?}",
+                    self.language, self.norm
+                ),
+                "Database Error"
+            ).into())
     }
 
     #[graphql(

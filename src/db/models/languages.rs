@@ -72,41 +72,30 @@ impl Language {
         relationship: AgentLanguageRelation,
     ) -> Result<Vec<User>, DatabaseError> {
         use schema::langandagents::dsl;
-        match &mut db.conn() {
-            Ok(conn) => Ok(dsl::langandagents
-                .filter(dsl::language.eq(self.id))
-                .filter(dsl::relationship.eq(relationship))
-                .load::<LangAndAgent>(conn)
-                .map_err(|e| {
-                    DatabaseError::new(
-                        format!(
-                            "Failed to retrieve language relationship: {:?}",
-                            e
-                        ),
-                        "Database reading error",
-                    )
-                })?
-                .iter()
-                .map(|v| {
-                    use schema::users::dsl;
-                    dsl::users.find(v.agent.clone()).first::<User>(conn)
-                })
-                .filter_map(|author| match author {
-                    Ok(val) => Some(val),
-                    Err(e) => {
-                        info!(
-                            "Failed ot retrieve author from database: {:?}",
-                            e
-                        );
-
-                        None
-                    }
-                })
-                .collect::<Vec<User>>()),
-            Err(e) => {
-                panic!("Could not connect to the database: {:?}", e);
-            }
-        }
+        let conn = &mut db.conn()?;
+        Ok(dsl::langandagents
+            .filter(dsl::language.eq(self.id))
+            .filter(dsl::relationship.eq(relationship))
+            .load::<LangAndAgent>(conn)
+            .map_err(|e| {
+                DatabaseError::new(
+                    format!("Failed to retrieve language relationship: {e:?}"),
+                    "Database reading error",
+                )
+            })?
+            .iter()
+            .map(|v| {
+                use schema::users::dsl;
+                dsl::users.find(v.agent.clone()).first::<User>(conn)
+            })
+            .filter_map(|author| match author {
+                Ok(val) => Some(val),
+                Err(e) => {
+                    info!("Failed ot retrieve author from database: {:?}", e);
+                    None
+                }
+            })
+            .collect::<Vec<User>>())
     }
 }
 
