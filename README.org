@@ -21,6 +21,14 @@ $ cargo run
 $ cargo run --release
 #+end_src
 
+This makes the API available at ~http://localhost:8000/~, with only
+three paths:
+- ~http://localhost:8000/~ :: GraphiQL interface
+- ~GET http://localhost:8000/graphql?query=:query~ :: ~GET~ queries for
+  the GraphQL API. However, it does not work due to [[https://github.com/graphql-rust/juniper/issues/1098][this issue]].
+- ~POST http://localhost:8000/graphql~ :: ~POST~ queries for the GraphQL
+  API.
+
 * License
 This project is under the AGPL 3.0 license. You can read the complete
 text [[file:LICENSE][here]], and if you just want a quick understanding of it, you can
