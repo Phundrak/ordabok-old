@@ -120,7 +120,7 @@ impl Query {
                 .find_word(uuid, query.as_str())
                 .map_err(Into::into),
             Err(e) => Err(DatabaseError::new(
-                format!("Failed to convert {} to a UUID: {:?}", language, e),
+                format!("Failed to convert {language} to a UUID: {e:?}"),
                 "Conversion Error",
             )
             .into()),
@@ -147,7 +147,7 @@ impl Query {
                 context.db.words(uuid, word.as_str()).map_err(Into::into)
             }
             Err(e) => Err(DatabaseError::new(
-                format!("Failed to convert {} to a UUID: {:?}", language, e),
+                format!("Failed to convert {language} to a UUID: {e:?}"),
                 "Conversion Error",
             )
             .into()),

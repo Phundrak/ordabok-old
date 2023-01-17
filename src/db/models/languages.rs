@@ -147,8 +147,7 @@ impl Language {
                 .map_err(|e| {
                     DatabaseError::new(
                         format!(
-                            "Failed to retrieve language translations: {:?}",
-                            e
+                            "Failed to retrieve language translations: {e:?}"
                         ),
                         "Database reading failure",
                     )
@@ -160,7 +159,7 @@ impl Language {
                 })
                 .collect::<Vec<Language>>()),
             Err(e) => Err(DatabaseError::new(
-                format!("Failed to connect to the database: {:?}", e),
+                format!("Failed to connect to the database: {e:?}"),
                 "Database connection failure",
             )
             .into()),
@@ -218,14 +217,14 @@ impl Language {
                 .map_err(|e| {
                     DatabaseError::new(
                         format!(
-                            "Failed to retrieve owner {} of language {}: {:?}",
-                            self.owner, self.name, e
+                            "Failed to retrieve owner {} of language {}: {e:?}",
+                            self.owner, self.name
                         ),
                         "Database reading error",
                     )
                 })?),
             Err(e) => Err(DatabaseError::new(
-                format!("Failed to connect to the database: {:?}", e),
+                format!("Failed to connect to the database: {e:?}"),
                 "Database connection failure",
             )
             .into()),

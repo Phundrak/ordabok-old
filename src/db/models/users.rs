@@ -28,7 +28,7 @@ impl User {
         use super::super::schema::{userfollows, users};
         let conn = &mut context.db.conn().map_err(|e| {
             DatabaseError::new(
-                format!("Failed to connect to database: {:?}", e),
+                format!("Failed to connect to database: {e:?}"),
                 "Database connection error",
             )
         })?;
@@ -38,8 +38,7 @@ impl User {
            .map_err(|e| {
                 DatabaseError::new(
                     format!(
-                        "Failed to retrieve user follows from database: {:?}",
-                        e
+                        "Failed to retrieve user follows from database: {e:?}"
                     ),
                     "Database reading error",
                 )
@@ -52,9 +51,8 @@ impl User {
                     Ok(val) => Some(val),
                     Err(e) => {
                         let err = DatabaseError::new(
-                            format!("Failed to retrieve user {} from database: {:?}",
-                                    f.following.clone(),
-                                    e),
+                            format!("Failed to retrieve user {} from database: {e:?}",
+                                    f.following.clone()),
                             "Database reading error");
                         debug!("{}", err);
                         None

@@ -76,7 +76,7 @@ impl Word {
                 .load::<WordRelation>(conn)
                 .map_err(|e| {
                     DatabaseError::new(
-                        format!("Failed to retrieve word relations: {:?}", e),
+                        format!("Failed to retrieve word relations: {e:?}"),
                         "Database reading failed",
                     )
                 })?
@@ -87,7 +87,7 @@ impl Word {
                 })
                 .collect::<Vec<Word>>()),
             Err(e) => Err(DatabaseError::new(
-                format!("Failed to connect to the database: {:?}", e),
+                format!("Failed to connect to the database: {e:?}"),
                 "Database connection error",
             )),
         }

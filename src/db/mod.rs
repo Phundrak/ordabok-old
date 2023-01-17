@@ -47,10 +47,7 @@ impl std::fmt::Display for DatabaseError {
 impl IntoFieldError for DatabaseError {
     fn into_field_error(self) -> juniper::FieldError<DefaultScalarValue> {
         let short = self.short;
-        FieldError::new(
-            self.long,
-            graphql_value!({ "error": short }),
-        )
+        FieldError::new(self.long, graphql_value!({ "error": short }))
     }
 }
 
@@ -88,7 +85,7 @@ impl Database {
     {
         self.conn.get().map_err(|e| {
             DatabaseError::new(
-                format!("Failed to connect to database: {:?}", e),
+                format!("Failed to connect to database: {e:?}"),
                 "Database connection error",
             )
         })
@@ -99,11 +96,11 @@ impl Database {
         languages
             .load::<Language>(&mut self.conn()?)
             .map_err(|e| {
-                info!("Failed to retrieve languages from database: {:?}", e);
+                info!("Failed to retrieve languages from database: {e:?}");
             })
             .map_err(|e| {
                 DatabaseError::new(
-                    format!("Failed to retrieve languages: {:?}", e),
+                    format!("Failed to retrieve languages: {e:?}"),
                     "Failed to retrieve languages",
                 )
             })
@@ -113,7 +110,7 @@ impl Database {
         use self::schema::users::dsl::users;
         users.load::<User>(&mut self.conn()?).map_err(|e| {
             DatabaseError::new(
-                format!("Failed to retrieve languages: {:?}", e),
+                format!("Failed to retrieve languages: {e:?}"),
                 "Failed to retrieve languages",
             )
         })
@@ -125,13 +122,12 @@ impl Database {
     ) -> Result<Vec<Language>, DatabaseError> {
         use self::schema::languages::dsl;
         dsl::languages
-            .filter(dsl::name.ilike(format!("%{}%", query)))
+            .filter(dsl::name.ilike(format!("%{query}%")))
             .load::<Language>(&mut self.conn()?)
             .map_err(|e| {
                 DatabaseError::new(
                     format!(
-                        "Failed to retrieve languages with query {}: {:?}",
-                        query, e
+                        "Failed to retrieve languages with query {query}: {e:?}"
                     ),
                     "Failed to retrieve languages",
                 )
@@ -141,13 +137,12 @@ impl Database {
     pub fn find_user(&self, query: &str) -> Result<Vec<User>, DatabaseError> {
         use self::schema::users::dsl;
         dsl::users
-            .filter(dsl::username.ilike(format!("%{}%", query)))
+            .filter(dsl::username.ilike(format!("%{query}%")))
             .load::<User>(&mut self.conn()?)
             .map_err(|e| {
                 DatabaseError::new(
                     format!(
-                        "Failed to retrieve users with query {}: {:?}",
-                        query, e
+                        "Failed to retrieve users with query {query}: {e:?}"
                     ),
                     "Failed to retrieve languages",
                 )
@@ -169,8 +164,7 @@ impl Database {
             Err(Error::NotFound) => Ok(None),
             Err(e) => Err(DatabaseError::new(
                 format!(
-                    "Failed to find language {} belonging to {}: {:?}",
-                    name, owner, e
+                    "Failed to find language {name} belonging to {owner}: {e:?}"
                 ),
                 "Database error",
             )),
@@ -183,10 +177,7 @@ impl Database {
             Ok(val) => Ok(Some(val)),
             Err(Error::NotFound) => Ok(None),
             Err(e) => Err(DatabaseError::new(
-                format!(
-                    "Failed to retrieve user {} from database: {:?}",
-                    id, e
-                ),
+                format!("Failed to retrieve user {id} from database: {e:?}"),
                 "Database Error",
             )),
         }
@@ -202,14 +193,14 @@ impl Database {
         match insert_into(users).values(user.clone()).execute(
             &mut self.conn().map_err(|e| {
                 DatabaseError::new(
-                    format!("Failed to connect to the database: {:?}", e),
+                    format!("Failed to connect to the database: {e:?}"),
                     "Connection error",
                 )
             })?,
         ) {
             Ok(_) => Ok(user),
             Err(e) => Err(DatabaseError {
-                long: format!("Failed to insert user {:?}: {:?}", user, e),
+                long: format!("Failed to insert user {user:?}: {e:?}"),
                 short: "Data insertion error".to_string(),
             }),
         }
@@ -222,7 +213,7 @@ impl Database {
         {
             Ok(_) => Ok(()),
             Err(e) => Err(DatabaseError::new(
-                format!("Failed to delete user {}: {:?}", id, e),
+                format!("Failed to delete user {id}: {e:?}"),
                 "User deletion error",
             )),
         }
@@ -234,10 +225,7 @@ impl Database {
             Ok(val) => Ok(Some(val)),
             Err(Error::NotFound) => Ok(None),
             Err(e) => Err(DatabaseError::new(
-                format!(
-                    "Failed to retrieve word {} from database: {:?}",
-                    id, e
-                ),
+                format!("Failed to retrieve word {id} from database: {e:?}"),
                 "Database Error",
             )),
         }
@@ -256,8 +244,7 @@ impl Database {
             .map_err(|e| {
                 DatabaseError::new(
                     format!(
-                        "Failed to retrieve word {} from language {}: {:?}",
-                        word, language, e
+                        "Failed to retrieve word {word} from language {language}: {e:?}"
                     ),
                     "Failed to retrieve languages",
                 )
@@ -272,14 +259,12 @@ impl Database {
         use self::schema::words::dsl;
         dsl::words
             .filter(dsl::language.eq(language))
-            .filter(dsl::norm.ilike(format!("%{}%", query)))
+            .filter(dsl::norm.ilike(format!("%{query}%")))
             .load::<Word>(&mut self.conn()?)
             .map_err(|e| {
                 DatabaseError::new(
                     format!(
-                        "Failed to retrieve words from language {} with query {}: {:?}",
-                        language,
-                        query, e
+                        "Failed to retrieve words from language {language} with query {query}: {e:?}"
                     ),
                     "Failed to retrieve languages",
                 )

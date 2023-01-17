@@ -22,7 +22,7 @@ impl APVariables {
         user_id: &str,
     ) -> Result<bool> {
         let client = reqwest::Client::new();
-        let url = format!("{}/users/{}/sessions", self.endpoint, user_id);
+        let url = format!("{}/users/{user_id}/sessions", self.endpoint);
         let response = client
             .get(url)
             .header("X-Appwrite-Key", self.api_key.clone())
