@@ -4,7 +4,7 @@ mod appwrite;
 mod db;
 mod graphql;
 
-use std::{env, error::Error};
+use std::{collections::HashSet, env, error::Error};
 
 use dotenvy::dotenv;
 use tracing::{debug, info, Level};
@@ -19,13 +19,13 @@ fn setup_logging() {
 }
 
 fn make_cors() -> Result<rocket_cors::Cors, rocket_cors::Error> {
-    use rocket_cors::{AllowedHeaders, AllowedOrigins};
-    use std::str::FromStr;
+    use rocket::http::Method as HMethod;
+    use rocket_cors::{AllowedHeaders, AllowedOrigins, Method};
     rocket_cors::CorsOptions {
-        allowed_methods: ["Get", "Post"]
-            .iter()
-            .map(|s| FromStr::from_str(s).unwrap())
-            .collect(),
+        allowed_methods: HashSet::from([
+            Method::from(HMethod::Get),
+            Method::from(HMethod::Post),
+        ]),
         allowed_headers: AllowedHeaders::some(&["Authorization", "Accept"]),
         allowed_origins: match env::var("ORDABOK_HOSTS") {
             Ok(val) => {
