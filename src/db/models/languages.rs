@@ -293,7 +293,7 @@ pub struct LangTranslatesTo {
 #[derive(Queryable, Insertable, Debug, Clone, PartialEq, Eq)]
 #[diesel(table_name = userfollowlanguage)]
 pub struct UserFollowLanguage {
-    id: i32,
-    lang: Uuid,
-    userid: String,
+    pub id: i32,
+    pub lang: Uuid,
+    pub userid: String,
 }

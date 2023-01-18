@@ -1,10 +1,11 @@
 use super::{
     super::schema,
+    languages::{Language, UserFollowLanguage},
     words::{Word, WordLearning, WordLearningStatus},
 };
 use diesel::prelude::*;
 use juniper::FieldResult;
-use tracing::{debug, info};
+use tracing::{debug, info, warn};
 
 use schema::{userfollows, users};
 
@@ -29,8 +30,8 @@ impl User {
     }
 
     #[graphql(description = "Who the user follows")]
-    pub fn following(&self, context: &Context) -> FieldResult<Vec<User>> {
-        use super::super::schema::{userfollows, users};
+    pub fn users_followed(&self, context: &Context) -> FieldResult<Vec<User>> {
+        use schema::{userfollows, users};
         let conn = &mut context.db.conn().map_err(|e| {
             DatabaseError::new(
                 format!("Failed to connect to database: {e:?}"),
@@ -66,6 +67,49 @@ impl User {
 
            })
            .collect::<Vec<User>>())
+    }
+
+    #[graphql(description = "Which languages the user follows")]
+    pub fn languages_followed(
+        &self,
+        context: &Context,
+    ) -> FieldResult<Vec<Language>> {
+        use schema::userfollowlanguage::dsl;
+        let conn = &mut context.db.conn().map_err(|e| {
+            DatabaseError::new(
+                format!("Failed to connect to database: {e:?}"),
+                "Database connection error",
+            )
+        })?;
+        Ok(dsl::userfollowlanguage
+            .filter(dsl::userid.eq(self.id.clone()))
+            .load::<UserFollowLanguage>(conn)
+           .map_err(|e| {
+                DatabaseError::new(
+                    format!(
+                        "Failed to retrieve user follows from database: {e:?}"
+                    ),
+                    "Database reading error",
+                )
+            })?
+           .iter()
+           .filter_map(|lang_follow| {
+               use schema::languages::dsl;
+               match dsl::languages
+                   .find(lang_follow.lang)
+                   .first::<Language>(conn) {
+                       Ok(language) => Some(language),
+                       Err(e) => {
+                           warn!(
+                               "Failed to retrieve language {} from database: {e:?}",
+                               lang_follow.lang
+                           );
+                           None
+                       }
+                   }
+           })
+           .collect::<Vec<Language>>()
+        )
     }
 
     #[graphql(
