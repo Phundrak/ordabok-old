@@ -64,7 +64,46 @@ impl User {
                         None
                     }
                 }
+           })
+           .collect::<Vec<User>>())
+    }
 
+    #[graphql(description = "Who follows this user")]
+    pub fn followers(&self, context: &Context) -> FieldResult<Vec<User>> {
+        use schema::userfollows::dsl;
+        let conn = &mut context.db.conn().map_err(|e| {
+            DatabaseError::new(
+                format!("Failed to connect to database: {e:?}"),
+                "Database connection error",
+            )
+        })?;
+        Ok(dsl::userfollows
+           .filter(dsl::following.eq(self.id.clone()))
+           .load::<UserFollow>(conn)
+           .map_err(|e| {
+                DatabaseError::new(
+                    format!(
+                        "Failed to retrieve user follows from database: {e:?}"
+                    ),
+                    "Database reading error",
+                )
+            })?
+           .iter()
+           .filter_map(|user_follow| {
+               use schema::users::dsl;
+               match dsl::users
+                   .find(user_follow.follower.clone())
+                   .first::<User>(conn) {
+                       Ok(user) => Some(user),
+                       Err(e) => {
+                           let err = DatabaseError::new(
+                               format!("Failed to retrieve user {} from database: {e:?}",
+                                       user_follow.follower.clone()),
+                               "Database reading error");
+                           debug!("{}", err);
+                           None
+                       }
+                   }
            })
            .collect::<Vec<User>>())
     }
