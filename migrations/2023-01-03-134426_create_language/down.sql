@@ -1,4 +1,5 @@
 -- This file should undo anything in `up.sql`
+DROP TABLE UserFollowLanguage;
 DROP TABLE LangAndAgents;
 DROP TABLE LangTranslatesTo;
 DROP TABLE Languages;

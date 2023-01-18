@@ -219,7 +219,7 @@ impl Database {
         }
     }
 
-    pub fn word_id(&self, id: &str) -> Result<Option<Word>, DatabaseError> {
+    pub fn word_id(&self, id: uuid::Uuid) -> Result<Option<Word>, DatabaseError> {
         use self::schema::words::dsl;
         match dsl::words.find(id).first::<Word>(&mut self.conn()?) {
             Ok(val) => Ok(Some(val)),

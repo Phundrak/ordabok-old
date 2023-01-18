@@ -96,7 +96,14 @@ impl Query {
         arguments(id(description = "Unique identifier of a word"))
     )]
     fn word(context: &Context, id: String) -> FieldResult<Option<Word>> {
-        context.db.word_id(id.as_str()).map_err(Into::into)
+        match Uuid::from_str(&id) {
+            Ok(uuid) => context.db.word_id(uuid).map_err(Into::into),
+            Err(e) => Err(DatabaseError::new(
+                format!("Failed to convert {id} to a UUID: {e:?}"),
+                "Conversion Error",
+            )
+            .into()),
+        }
     }
 
     #[graphql(

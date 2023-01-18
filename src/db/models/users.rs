@@ -1,7 +1,12 @@
-use super::super::schema::{userfollows, users};
+use super::{
+    super::schema,
+    words::{Word, WordLearning, WordLearningStatus},
+};
 use diesel::prelude::*;
 use juniper::FieldResult;
-use tracing::debug;
+use tracing::{debug, info};
+
+use schema::{userfollows, users};
 
 use crate::{db::DatabaseError, graphql::Context};
 
@@ -33,8 +38,8 @@ impl User {
             )
         })?;
         Ok(userfollows::dsl::userfollows
-            .filter(userfollows::dsl::follower.eq(self.id.clone()))
-            .load::<UserFollow>(conn)
+           .filter(userfollows::dsl::follower.eq(self.id.clone()))
+           .load::<UserFollow>(conn)
            .map_err(|e| {
                 DatabaseError::new(
                     format!(
@@ -61,6 +66,53 @@ impl User {
 
            })
            .collect::<Vec<User>>())
+    }
+
+    #[graphql(
+        description = "What words the user is learning or has learned",
+        arguments(status(
+            description = "Display either words being learned or words learned"
+        ))
+    )]
+    pub fn words_learning(
+        &self,
+        context: &Context,
+        status: WordLearningStatus,
+    ) -> FieldResult<Vec<Word>> {
+        use schema::wordlearning::dsl;
+        let conn = &mut context.db.conn().map_err(|e| {
+            DatabaseError::new(
+                format!("Failed to connect to database: {e:?}"),
+                "Database connection error",
+            )
+        })?;
+        Ok(dsl::wordlearning
+            .filter(dsl::userid.eq(self.id.clone()))
+            .filter(dsl::status.eq(status))
+            .load::<WordLearning>(conn)
+            .map_err(|e| {
+                DatabaseError::new(
+                    format!(
+                        "Failed to retrieve user follows from database: {e:?}"
+                    ),
+                    "Database reading error",
+                )
+            })?
+            .iter()
+            .filter_map(|lang_learn| {
+                use schema::words::dsl;
+                match dsl::words.find(lang_learn.word).first::<Word>(conn) {
+                    Ok(word) => Some(word),
+                    Err(e) => {
+                        info!(
+                            "Failed to retrieve word {} from database: {e:?}",
+                            lang_learn.word
+                        );
+                        None
+                    }
+                }
+            })
+            .collect::<Vec<Word>>())
     }
 }
 

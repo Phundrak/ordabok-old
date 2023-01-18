@@ -51,3 +51,17 @@ CREATE TABLE LangAndAgents (
     NOT NULL,
   relationship AgentLanguageRelation NOT NULL
 );
+
+CREATE TABLE UserFollowLanguage (
+  id SERIAL PRIMARY KEY,
+  lang UUID
+    REFERENCES Languages(id)
+    ON UPDATE CASCADE
+    ON DELETE CASCADE
+    NOT NULL,
+  userid VARCHAR(31)
+    REFERENCES Users(id)
+    ON UPDATE CASCADE
+    ON DELETE CASCADE
+    NOT NULL
+);

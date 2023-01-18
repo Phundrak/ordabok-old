@@ -13,7 +13,7 @@ use super::users::User;
 
 use std::convert::Into;
 
-use schema::{langandagents, langtranslatesto, languages};
+use schema::{langandagents, langtranslatesto, languages, userfollowlanguage};
 
 #[derive(
     diesel_derive_enum::DbEnum, Debug, Clone, PartialEq, Eq, GraphQLEnum,
@@ -209,7 +209,7 @@ impl Language {
                             "Failed to retrieve owner {} of language {}: {e:?}",
                             self.owner, self.name
                         ),
-                        "Database reading error",
+                        "Database error",
                     )
                 })?),
             Err(e) => Err(DatabaseError::new(
@@ -235,6 +235,42 @@ impl Language {
         self.relationship(&context.db, AgentLanguageRelation::Publisher)
             .map_err(Into::into)
     }
+
+    #[graphql(description = "People following the language")]
+    fn followers(&self, context: &Context) -> FieldResult<Vec<User>> {
+        use schema::userfollowlanguage::dsl;
+        match &mut context.db.conn() {
+            Ok(conn) => {
+                Ok(dsl::userfollowlanguage
+                   .filter(dsl::lang.eq(self.id))
+                   .load::<UserFollowLanguage>(conn)
+                   .map_err(|e| {
+                       DatabaseError::new(format!("Failed to retrieve language followers for language {}: {e:?}", self.id),
+                       "Database error")
+                   })?
+                   .into_iter()
+                   .filter_map(|follow| {
+                       use schema::users::dsl;
+                       match dsl::users
+                           .find(follow.userid.clone())
+                           .first::<User>(conn) {
+                               Ok(user) => Some(user),
+                               Err(e) => {
+                                   info!("Failed to retrieve user {} from database: {e:?}", follow.userid);
+                                   None
+                               }
+                           }
+                   })
+                   .collect::<Vec<User>>()
+                )
+            }
+            Err(e) => Err(DatabaseError::new(
+                format!("Failed to connect to the database: {e:?}"),
+                "Database connection failure",
+            )
+            .into()),
+        }
+    }
 }
 
 #[derive(Queryable, Insertable, Debug, Clone, PartialEq, Eq)]
@@ -252,4 +288,12 @@ pub struct LangTranslatesTo {
     id: i32,
     langfrom: Uuid,
     langto: Uuid,
+}
+
+#[derive(Queryable, Insertable, Debug, Clone, PartialEq, Eq)]
+#[diesel(table_name = userfollowlanguage)]
+pub struct UserFollowLanguage {
+    id: i32,
+    lang: Uuid,
+    userid: String,
 }

@@ -1,12 +1,14 @@
 -- Your SQL goes here
 CREATE TYPE PartOfSpeech as ENUM ('ADJ', 'ADP', 'ADV', 'AUX', 'CCONJ', 'DET', 'INTJ', 'NOUN', 'NUM', 'PART', 'PRON', 'PROPN', 'PUNCT', 'SCONJ', 'SYM', 'VERB', 'X');
 CREATE TYPE WordRelationship as ENUM('def', 'related');
+CREATE TYPE WordLearningStatus as ENUM('learning', 'learned');
 
 CREATE TABLE Words (
-  norm VARCHAR(255) PRIMARY KEY, -- normalized word
+  id UUID DEFAULT uuid_generate_v4 () PRIMARY KEY,
+  norm VARCHAR(255) NOT NULL, -- normalized word, generally in latin alphabet
   native VARCHAR(255),
-  lemma VARCHAR(255)
-    REFERENCES Words(norm)
+  lemma UUID
+    REFERENCES Words(id)
     ON UPDATE CASCADE
     ON DELETE SET NULL,
   language UUID
@@ -26,15 +28,30 @@ CREATE TABLE Words (
 
 CREATE TABLE WordRelation (
   id SERIAL PRIMARY KEY,
-  wordsource VARCHAR(255)
-    REFERENCES Words(norm)
+  wordsource UUID
+    REFERENCES Words(id)
     ON UPDATE CASCADE
     ON DELETE CASCADE
     NOT NULL,
-  wordtarget VARCHAR(255)
-    REFERENCES Words(norm)
+  wordtarget UUID
+    REFERENCES Words(id)
     ON UPDATE CASCADE
     ON DELETE CASCADE
     NOT NULL,
   relationship WordRelationship NOT NULL
+);
+
+CREATE TABLE WordLearning (
+  id SERIAL PRIMARY KEY,
+  word UUID
+    REFERENCES Words(id)
+    ON UPDATE CASCADE
+    ON DELETE CASCADE
+    NOT NULL,
+  userid VARCHAR(31)
+    REFERENCES Users(id)
+    ON UPDATE CASCADE
+    ON DELETE CASCADE
+    NOT NULL,
+  status WordLearningStatus DEFAULT 'learning' NOT NULL
 );

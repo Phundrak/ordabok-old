@@ -18,6 +18,10 @@ pub mod sql_types {
     pub struct Release;
 
     #[derive(diesel::sql_types::SqlType)]
+    #[diesel(postgres_type(name = "wordlearningstatus"))]
+    pub struct Wordlearningstatus;
+
+    #[derive(diesel::sql_types::SqlType)]
     #[diesel(postgres_type(name = "wordrelationship"))]
     pub struct Wordrelationship;
 }
@@ -64,6 +68,14 @@ diesel::table! {
 }
 
 diesel::table! {
+    userfollowlanguage (id) {
+        id -> Int4,
+        lang -> Uuid,
+        userid -> Varchar,
+    }
+}
+
+diesel::table! {
     userfollows (id) {
         id -> Int4,
         follower -> Varchar,
@@ -80,12 +92,24 @@ diesel::table! {
 
 diesel::table! {
     use diesel::sql_types::*;
+    use super::sql_types::Wordlearningstatus;
+
+    wordlearning (id) {
+        id -> Int4,
+        word -> Uuid,
+        userid -> Varchar,
+        status -> Wordlearningstatus,
+    }
+}
+
+diesel::table! {
+    use diesel::sql_types::*;
     use super::sql_types::Wordrelationship;
 
     wordrelation (id) {
         id -> Int4,
-        wordsource -> Varchar,
-        wordtarget -> Varchar,
+        wordsource -> Uuid,
+        wordtarget -> Uuid,
         relationship -> Wordrelationship,
     }
 }
@@ -94,10 +118,11 @@ diesel::table! {
     use diesel::sql_types::*;
     use super::sql_types::Partofspeech;
 
-    words (norm) {
+    words (id) {
+        id -> Uuid,
         norm -> Varchar,
         native -> Nullable<Varchar>,
-        lemma -> Nullable<Varchar>,
+        lemma -> Nullable<Uuid>,
         language -> Uuid,
         partofspeech -> Partofspeech,
         audio -> Nullable<Varchar>,
@@ -113,14 +138,20 @@ diesel::table! {
 diesel::joinable!(langandagents -> languages (language));
 diesel::joinable!(langandagents -> users (agent));
 diesel::joinable!(languages -> users (owner));
+diesel::joinable!(userfollowlanguage -> languages (lang));
+diesel::joinable!(userfollowlanguage -> users (userid));
+diesel::joinable!(wordlearning -> users (userid));
+diesel::joinable!(wordlearning -> words (word));
 diesel::joinable!(words -> languages (language));
 
 diesel::allow_tables_to_appear_in_same_query!(
     langandagents,
     langtranslatesto,
     languages,
+    userfollowlanguage,
     userfollows,
     users,
+    wordlearning,
     wordrelation,
     words,
 );

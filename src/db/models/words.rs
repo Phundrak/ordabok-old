@@ -5,8 +5,9 @@ use crate::{
 };
 use diesel::prelude::*;
 use juniper::{FieldResult, GraphQLEnum};
-use schema::{wordrelation, words};
+use schema::{wordrelation, words, wordlearning};
 use tracing::info;
+use uuid::Uuid;
 
 use std::convert::Into;
 
@@ -17,6 +18,13 @@ use super::languages::Language;
 pub enum WordRelationship {
     Definition,
     Related,
+}
+
+#[derive(diesel_derive_enum::DbEnum, Debug, Clone, PartialEq, Eq, juniper::GraphQLEnum)]
+#[DieselTypePath = "crate::db::schema::sql_types::Wordlearningstatus"]
+pub enum WordLearningStatus {
+    Learning,
+    Learned
 }
 
 #[derive(
@@ -48,9 +56,10 @@ pub enum PartOfSpeech {
 
 #[derive(Queryable, Insertable, Debug, Clone, PartialEq, Eq)]
 pub struct Word {
+    id: Uuid,
     norm: String,
     native: Option<String>,
-    lemma: Option<String>,
+    lemma: Option<Uuid>,
     language: uuid::Uuid,
     partofspeech: PartOfSpeech,
     audio: Option<String>,
@@ -71,7 +80,7 @@ impl Word {
         use schema::wordrelation::dsl;
         match &mut db.conn() {
             Ok(conn) => Ok(dsl::wordrelation
-                .filter(dsl::wordsource.eq(self.norm.clone()))
+                .filter(dsl::wordsource.eq(self.id))
                 .filter(dsl::relationship.eq(relationship))
                 .load::<WordRelation>(conn)
                 .map_err(|e| {
@@ -81,9 +90,9 @@ impl Word {
                     )
                 })?
                 .into_iter()
-                .flat_map(|w| {
+                .flat_map(|word| {
                     use schema::words::dsl;
-                    dsl::words.find(w.wordtarget).first::<Word>(conn)
+                    dsl::words.find(word.wordtarget).first::<Word>(conn)
                 })
                 .collect::<Vec<Word>>()),
             Err(e) => Err(DatabaseError::new(
@@ -109,20 +118,18 @@ impl Word {
     #[graphql(description = "Base form of the current word")]
     fn lemma(&self, context: &Context) -> Option<Word> {
         use schema::words::dsl;
-        match self.lemma.clone() {
+        match self.lemma {
             Some(lemma) => match &mut context.db.conn() {
-                Ok(conn) => {
-                    match dsl::words.find(lemma.clone()).first::<Word>(conn) {
-                        Ok(word) => Some(word),
-                        Err(e) => {
-                            info!(
-                                "Failed to retrieve lemma {} of word {}: {:?}",
-                                lemma, self.norm, e
-                            );
-                            None
-                        }
+                Ok(conn) => match dsl::words.find(lemma).first::<Word>(conn) {
+                    Ok(word) => Some(word),
+                    Err(e) => {
+                        info!(
+                            "Failed to retrieve lemma {} of word {}: {:?}",
+                            lemma, self.norm, e
+                        );
+                        None
                     }
-                }
+                },
                 Err(e) => {
                     info!("Could not connect to the database: {:?}", e);
                     None
@@ -211,7 +218,16 @@ impl Word {
 #[diesel(table_name = wordrelation)]
 pub struct WordRelation {
     id: i32,
-    wordsource: String,
-    wordtarget: String,
+    wordsource: Uuid,
+    wordtarget: Uuid,
     relationship: WordRelationship,
+}
+
+#[derive(Queryable, Insertable, Debug, Clone, PartialEq, Eq)]
+#[diesel(table_name = wordlearning)]
+pub struct WordLearning {
+    pub id: i32,
+    pub word: Uuid,
+    pub userid: String,
+    pub status: WordLearningStatus
 }
