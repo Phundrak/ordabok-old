@@ -5,11 +5,11 @@ use crate::{
 };
 use diesel::prelude::*;
 use juniper::{FieldResult, GraphQLEnum};
-use schema::{wordrelation, words, wordlearning};
+use schema::{wordlearning, wordrelation, words};
 use tracing::info;
 use uuid::Uuid;
 
-use std::convert::Into;
+use std::{convert::Into, str::FromStr};
 
 use super::languages::Language;
 
@@ -20,11 +20,18 @@ pub enum WordRelationship {
     Related,
 }
 
-#[derive(diesel_derive_enum::DbEnum, Debug, Clone, PartialEq, Eq, juniper::GraphQLEnum)]
+#[derive(
+    diesel_derive_enum::DbEnum,
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    juniper::GraphQLEnum,
+)]
 #[DieselTypePath = "crate::db::schema::sql_types::Wordlearningstatus"]
 pub enum WordLearningStatus {
     Learning,
-    Learned
+    Learned,
 }
 
 #[derive(
@@ -52,6 +59,72 @@ pub enum PartOfSpeech {
     Symbol,
     Verb,
     Other,
+}
+
+impl Default for PartOfSpeech {
+    fn default() -> Self {
+        Self::Noun
+    }
+}
+
+#[derive(Debug, Clone, juniper::GraphQLInputObject)]
+pub struct NewWord {
+    norm: String,
+    native: Option<String>,
+    lemma: Option<String>,
+    language: String,
+    partofspeech: PartOfSpeech,
+    audio: Option<String>,
+    video: Option<String>,
+    image: Option<String>,
+    description: Option<String>,
+    etymology: Option<String>,
+    lusage: Option<String>,
+    morphology: Option<String>,
+}
+
+#[derive(Debug, Clone, Insertable)]
+#[diesel(table_name = words)]
+struct NewWordInternal {
+    norm: String,
+    native: Option<String>,
+    lemma: Option<Uuid>,
+    language: Uuid,
+    partofspeech: PartOfSpeech,
+    audio: Option<String>,
+    video: Option<String>,
+    image: Option<String>,
+    description: Option<String>,
+    etymology: Option<String>,
+    lusage: Option<String>,
+    morphology: Option<String>,
+}
+
+impl TryFrom<NewWord> for NewWordInternal {
+    type Error = uuid::Error;
+
+    fn try_from(value: NewWord) -> Result<Self, Self::Error> {
+        let language = Uuid::from_str(&value.language)?;
+        let lemma = if let Some(original_lemma) = value.lemma {
+            Some(Uuid::from_str(&original_lemma)?)
+        } else {
+            None
+        };
+        Ok(Self {
+            norm: value.norm,
+            native: value.native,
+            lemma,
+            language,
+            partofspeech: value.partofspeech,
+            audio: value.audio,
+            video: value.video,
+            image: value.image,
+            description: value.description,
+            etymology: value.etymology,
+            lusage: value.lusage,
+            morphology: value.morphology,
+        })
+    }
 }
 
 #[derive(Queryable, Insertable, Debug, Clone, PartialEq, Eq)]
@@ -229,5 +302,5 @@ pub struct WordLearning {
     pub id: i32,
     pub word: Uuid,
     pub userid: String,
-    pub status: WordLearningStatus
+    pub status: WordLearningStatus,
 }

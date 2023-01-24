@@ -1,6 +1,15 @@
-use juniper::FieldResult;
+use std::str::FromStr;
 
-use crate::db::{models::users::User, DatabaseError};
+use juniper::FieldResult;
+use uuid::Uuid;
+
+use crate::db::{
+    models::{
+        languages::{Language, NewLanguage, UserFollowLanguage},
+        users::User,
+    },
+    DatabaseError,
+};
 
 use super::Context;
 
@@ -9,7 +18,7 @@ pub struct Mutation;
 #[juniper::graphql_object(Context = Context)]
 impl Mutation {
     fn api_version(context: &Context) -> String {
-        if context.user_auth {
+        if context.user_auth.is_some() {
             "0.1 (authentified)"
         } else {
             "0.1 (not authentified)"
@@ -47,6 +56,105 @@ impl Mutation {
         } else {
             Err(DatabaseError::new("Invalid admin key", "Invalid admin key")
                 .into())
+        }
+    }
+
+    pub fn user_follow_language(
+        context: &Context,
+        language: String,
+    ) -> FieldResult<Language> {
+        if let Some(userid) = &context.user_auth {
+            match Uuid::from_str(&language) {
+                Err(e) => Err(DatabaseError::new(
+                    format!(
+                        "Could not parse {language} as a valid UUID: {e:?}"
+                    ),
+                    "Bad Request",
+                )
+                .into()),
+                Ok(lang) => UserFollowLanguage::user_follow_language(
+                    context,
+                    &userid.to_string(),
+                    lang,
+                )
+                .map_err(Into::into),
+            }
+        } else {
+            Err(DatabaseError::new(
+                "User not authentificated, cannot proceed",
+                "Unauthorized",
+            )
+            .into())
+        }
+    }
+
+    pub fn user_unfollow_language(
+        context: &Context,
+        language: String,
+    ) -> FieldResult<Language> {
+        if let Some(userid) = &context.user_auth {
+            match Uuid::from_str(&language) {
+                Err(e) => Err(DatabaseError::new(
+                    format!(
+                        "Could not parse {language} as a valid UUID: {e:?}"
+                    ),
+                    "Bad Request",
+                )
+                .into()),
+                Ok(lang) => UserFollowLanguage::user_unfollow_language(
+                    context,
+                    &userid.to_string(),
+                    lang,
+                )
+                .map_err(Into::into),
+            }
+        } else {
+            Err(DatabaseError::new(
+                "User not authentificated, cannot proceed",
+                "Unauthorized",
+            )
+            .into())
+        }
+    }
+
+    pub fn new_language(
+        context: &Context,
+        language: NewLanguage,
+    ) -> FieldResult<Language> {
+        if let Some(owner) = &context.user_auth {
+            language.insert_db(&context.db, owner).map_err(Into::into)
+        } else {
+            Err(DatabaseError::new(
+                "User not authentificated, cannot create new language",
+                "Unauthorized",
+            )
+            .into())
+        }
+    }
+
+    pub fn delete_language(
+        context: &Context,
+        language: String,
+    ) -> FieldResult<Option<Language>> {
+        if context.user_auth.is_some() {
+            match Uuid::from_str(&language) {
+                Ok(uuid) => Language::delete(context, uuid)
+                    .map(|_| None)
+                    .map_err(Into::into),
+                Err(e) => Err(DatabaseError::new(
+                    format!(
+                        "Could not parse {language} as a valid UUID: {e:?}"
+                    ),
+                    "Bad Request",
+                )
+                .into()),
+            }
+        } else {
+            Err(DatabaseError::new(
+                "User not authentificated, cannot create new language",
+                "Unauthorized",
+            )
+            .into())
         }
     }
 }

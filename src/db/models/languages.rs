@@ -27,6 +27,12 @@ pub enum Release {
     Private,
 }
 
+impl Default for Release {
+    fn default() -> Self {
+        Self::Public
+    }
+}
+
 #[derive(
     diesel_derive_enum::DbEnum, Debug, Clone, PartialEq, Eq, GraphQLEnum,
 )]
@@ -50,6 +56,91 @@ pub enum AgentLanguageRelation {
     Author,
 }
 
+#[derive(Default, Debug, Clone, juniper::GraphQLInputObject)]
+pub struct NewLanguage {
+    name: String,
+    native: Option<String>,
+    release: Option<Release>,
+    genre: Vec<DictGenre>,
+    abstract_: Option<String>,
+    description: Option<String>,
+    rights: Option<String>,
+    license: Option<String>,
+}
+
+#[derive(Insertable, Debug, Clone)]
+#[diesel(table_name = languages)]
+struct NewLanguageInternal {
+    name: String,
+    native: Option<String>,
+    release: Release,
+    genre: Vec<DictGenre>,
+    abstract_: Option<String>,
+    description: Option<String>,
+    rights: Option<String>,
+    license: Option<String>,
+    owner: String,
+}
+
+impl From<NewLanguage> for NewLanguageInternal {
+    fn from(val: NewLanguage) -> Self {
+        NewLanguageInternal {
+            name: val.name,
+            native: val.native,
+            release: if let Some(release) = val.release {
+                release
+            } else {
+                Release::default()
+            },
+            genre: val.genre,
+            abstract_: val.abstract_,
+            description: val.description,
+            rights: val.rights,
+            license: val.license,
+            owner: String::new(),
+        }
+    }
+}
+
+impl NewLanguage {
+    pub fn insert_db(
+        &self,
+        db: &Database,
+        owner: &str,
+    ) -> Result<Language, DatabaseError> {
+        use languages::dsl;
+        let conn = &mut db.conn()?;
+        match diesel::insert_into(dsl::languages)
+            .values(NewLanguageInternal {
+                owner: owner.to_string(),
+                ..self.clone().into()
+            })
+            .execute(conn)
+        {
+            Ok(_) => dsl::languages
+                .filter(dsl::name.eq(self.name.clone()))
+                .filter(dsl::owner.eq(owner))
+                .first::<Language>(conn)
+                .map_err(|e| {
+                    DatabaseError::new(
+                        format!(
+                            "Failed to find language {} by user {owner}: {e:?}",
+                            self.name
+                        ),
+                        "Database Error",
+                    )
+                }),
+            Err(e) => Err(DatabaseError::new(
+                format!(
+                    "Failed to insert language {} by user {owner}: {e:?}",
+                    self.name
+                ),
+                "Database Error",
+            )),
+        }
+    }
+}
+
 #[derive(Queryable, Insertable, Debug, Clone)]
 pub struct Language {
     id: Uuid,
@@ -66,6 +157,59 @@ pub struct Language {
 }
 
 impl Language {
+    pub fn find(
+        db: &Database,
+        language: Uuid,
+    ) -> Result<Language, DatabaseError> {
+        use languages::dsl;
+        dsl::languages.find(language).first::<Language>(&mut db.conn()?).map_err(|e| match e {
+            diesel::NotFound => DatabaseError::new(
+                format!("Language {language} not found"),
+                "Not Found"
+            ),
+            e => DatabaseError::new(
+                format!("Error fetching language {language} from database: {e:?}"),
+                "Database Error"
+            )
+        })
+    }
+
+    pub fn delete(
+        context: &Context,
+        language_id: Uuid,
+    ) -> Result<(), DatabaseError> {
+        use languages::dsl;
+        let conn = &mut context.db.conn()?;
+        match dsl::languages.find(language_id)
+                            .first::<Language>(conn)
+        {
+            Ok(language) if context.user_auth == Some(language.owner.clone()) => {
+        match diesel::delete(dsl::languages.find(language_id))
+            .execute(conn) {
+                Ok(_) => Ok(()),
+                Err(e) => Err(DatabaseError::new(
+                    format!("Failed to delete language {language_id}: {e:?}"),
+                    "Database Error"
+                ))
+            }
+            },
+            Ok(language) => {
+                Err(DatabaseError::new(
+                    format!(
+                        "User {} not allowed to delete other user's language {language_id}",
+                        language.owner),
+                    "Unauthorized"
+                ))
+            },
+            Err(e) => {
+                Err(DatabaseError::new(
+                    format!("Failed to delete language {language_id}: {e:?}"),
+                    "Database Error"
+                ))
+            }
+        }
+    }
+
     fn relationship(
         &self,
         db: &Database,
@@ -290,10 +434,85 @@ pub struct LangTranslatesTo {
     langto: Uuid,
 }
 
+#[derive(Insertable)]
+#[diesel(table_name = userfollowlanguage)]
+pub struct UserFollowLanguageInsert {
+    pub lang: Uuid,
+    pub userid: String,
+}
+
 #[derive(Queryable, Insertable, Debug, Clone, PartialEq, Eq)]
 #[diesel(table_name = userfollowlanguage)]
 pub struct UserFollowLanguage {
     pub id: i32,
     pub lang: Uuid,
     pub userid: String,
+}
+
+impl UserFollowLanguage {
+    pub fn user_follow_language(
+        context: &Context,
+        userid: &str,
+        lang: Uuid,
+    ) -> Result<Language, DatabaseError> {
+        let conn = &mut context.db.conn()?;
+        match languages::dsl::languages.find(lang).first::<Language>(conn) {
+            Err(diesel::NotFound) => Err(DatabaseError::new(
+                format!("Cannot follow non-existing language {lang}"),
+                "Invalid Language",
+            )),
+            Err(e) => Err(DatabaseError::new(
+                format!(
+                    "Could not retrieve language {lang} from database: {e:?}"
+                ),
+                "Database error",
+            )),
+            Ok(language) => {
+                use userfollowlanguage::dsl;
+                match diesel::insert_into(dsl::userfollowlanguage)
+                    .values(UserFollowLanguageInsert { lang, userid: userid.to_string() })
+                    .execute(conn) {
+                        Ok(_) => Ok(language),
+                        Err(e) => Err(DatabaseError::new(
+                            format!("Failed to follow language {lang} as user {userid}: {e:?}"),
+                            "Database Error"
+                        ))
+                    }
+            }
+        }
+    }
+
+    pub fn user_unfollow_language(
+        context: &Context,
+        userid: &str,
+        lang: Uuid,
+    ) -> Result<Language, DatabaseError> {
+        use userfollowlanguage::dsl;
+        let conn = &mut context.db.conn()?;
+        match dsl::userfollowlanguage
+            .filter(dsl::userid.eq(userid.to_string()))
+            .filter(dsl::lang.eq(lang))
+            .first::<UserFollowLanguage>(conn) {
+                Ok(relationship) => {
+                    match diesel::delete(dsl::userfollowlanguage.find(relationship.id))
+                        .execute(conn) {
+                            Ok(_) => Language::find(&context.db, lang),
+                            Err(e) => Err(DatabaseError::new(
+                                format!("Failed to make user {userid} unfollow language {lang}: {e:?}"),
+                                "Database Error"
+                            ))
+                        }
+                },
+                Err(diesel::NotFound) => {
+                    Err(DatabaseError::new(
+                        format!("User {userid} does not follow language {lang}"),
+                        "Invalid",
+                    ))
+                }
+                Err(e) => Err(DatabaseError::new(
+                    format!("Failed to retrieve relationship between user {userid} and language {lang} from database: {e:?}"),
+                    "Database Error",
+                ))
+            }
+    }
 }

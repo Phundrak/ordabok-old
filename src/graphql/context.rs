@@ -27,35 +27,42 @@ impl Default for OtherEnvVar {
 pub struct Context {
     pub db: Database,
     pub appwrite: APVariables,
-    pub user_auth: bool,
+    pub user_auth: Option<String>,
     pub other_vars: OtherEnvVar,
 }
 
 impl Context {
-    /// HTTP header for a user's session
+    /// Check if a request is performed by an autentificated user.
     ///
-    /// This header `Authorization` must be a single string in the
+    /// The HTTP header `Authorization` must be a single string in the
     /// form `userId;userSessionId` with `userId` and `userSessionId`
     /// being variables given by Appwrite to users that are logged in.
-    pub async fn user_auth<'r>(&self, auth_token: Option<&'r str>) -> bool {
+    ///
+    /// The function returns either the user's ID if the user is
+    /// authentified or `None`.
+    pub async fn user_auth<'r>(
+        &self,
+        auth_token: Option<&'r str>,
+    ) -> Option<String> {
         if let Some(token) = auth_token {
             let key = token.split(';').collect::<Vec<_>>();
             if key.len() == 2 {
                 let user_id = key[0];
                 let session_id = key[1];
                 match self.appwrite.check_session(session_id, user_id).await {
-                    Ok(val) => val,
+                    Ok(true) => Some(key[0].to_string()),
+                    Ok(false) => None,
                     Err(e) => {
                         info!("Error checking user session: {:?}", e);
-                        false
+                        None
                     }
                 }
             } else {
                 info!("Invalid session key: {}", token);
-                false
+                None
             }
         } else {
-            false
+            None
         }
     }
 
