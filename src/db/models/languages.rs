@@ -11,7 +11,7 @@ use uuid::Uuid;
 use super::super::schema;
 use super::users::User;
 
-use std::convert::Into;
+use std::{convert::Into, fmt::Display};
 
 use schema::{langandagents, langtranslatesto, languages, userfollowlanguage};
 
@@ -103,7 +103,7 @@ impl From<NewLanguage> for NewLanguageInternal {
 }
 
 impl NewLanguage {
-    pub fn insert_db(
+    pub fn insert(
         &self,
         db: &Database,
         owner: &str,
@@ -156,7 +156,17 @@ pub struct Language {
     owner: String,
 }
 
+impl Display for Language {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}/{} ({})", self.owner, self.name, self.id)
+    }
+}
+
 impl Language {
+    pub fn is_owned_by(&self, owner: &str) -> bool {
+        self.owner == owner
+    }
+
     pub fn find(
         db: &Database,
         language: Uuid,
@@ -184,14 +194,14 @@ impl Language {
                             .first::<Language>(conn)
         {
             Ok(language) if context.user_auth == Some(language.owner.clone()) => {
-        match diesel::delete(dsl::languages.find(language_id))
-            .execute(conn) {
-                Ok(_) => Ok(()),
-                Err(e) => Err(DatabaseError::new(
-                    format!("Failed to delete language {language_id}: {e:?}"),
-                    "Database Error"
-                ))
-            }
+                match diesel::delete(dsl::languages.find(language_id))
+                    .execute(conn) {
+                        Ok(_) => Ok(()),
+                        Err(e) => Err(DatabaseError::new(
+                            format!("Failed to delete language {language_id}: {e:?}"),
+                            "Database Error"
+                        ))
+                    }
             },
             Ok(language) => {
                 Err(DatabaseError::new(

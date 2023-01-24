@@ -7,6 +7,7 @@ use crate::db::{
     models::{
         languages::{Language, NewLanguage, UserFollowLanguage},
         users::User,
+        words::{NewWord, Word},
     },
     DatabaseError,
 };
@@ -122,7 +123,7 @@ impl Mutation {
         language: NewLanguage,
     ) -> FieldResult<Language> {
         if let Some(owner) = &context.user_auth {
-            language.insert_db(&context.db, owner).map_err(Into::into)
+            language.insert(&context.db, owner).map_err(Into::into)
         } else {
             Err(DatabaseError::new(
                 "User not authentificated, cannot create new language",
@@ -145,6 +146,42 @@ impl Mutation {
                     format!(
                         "Could not parse {language} as a valid UUID: {e:?}"
                     ),
+                    "Bad Request",
+                )
+                .into()),
+            }
+        } else {
+            Err(DatabaseError::new(
+                "User not authentificated, cannot create new language",
+                "Unauthorized",
+            )
+            .into())
+        }
+    }
+
+    pub fn new_word(context: &Context, word: NewWord) -> FieldResult<Word> {
+        if let Some(user) = &context.user_auth {
+            word.insert(context, user).map_err(Into::into)
+        } else {
+            Err(DatabaseError::new(
+                "User not authentificated, cannot create new language",
+                "Unauthorized",
+            )
+            .into())
+        }
+    }
+
+    pub fn delete_word(
+        context: &Context,
+        word: String,
+    ) -> FieldResult<Option<Word>> {
+        if let Some(user) = &context.user_auth {
+            match Uuid::from_str(&word) {
+                Ok(id) => Word::delete(context, id, user)
+                    .map(|_| None)
+                    .map_err(Into::into),
+                Err(e) => Err(DatabaseError::new(
+                    format!("Could not parse {word} as a valid UUID: {e:?}"),
                     "Bad Request",
                 )
                 .into()),

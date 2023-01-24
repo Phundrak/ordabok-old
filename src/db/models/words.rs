@@ -83,6 +83,60 @@ pub struct NewWord {
     morphology: Option<String>,
 }
 
+impl NewWord {
+    pub fn insert(
+        &self,
+        context: &Context,
+        user: &str,
+    ) -> Result<Word, DatabaseError> {
+        use words::dsl;
+        let conn = &mut context.db.conn()?;
+        let mut word: NewWordInternal =
+            self.clone().try_into().map_err(|e| {
+                DatabaseError::new(
+                    format!("Failed to parse string as uuid: {e:?}"),
+                    "Invalid Input",
+                )
+            })?;
+        match Language::find(&context.db, word.language) {
+            Ok(language) if language.is_owned_by(<&str>::clone(&user)) => {
+                // Check lemma exists
+                word.lemma = if let Some(id) = word.lemma {
+                    match dsl::words.find(id).first::<Word>(conn) {
+                        Ok(_) => Some(id),
+                        Err(_) => None,
+                    }
+                } else {
+                    None
+                };
+                match diesel::insert_into(dsl::words)
+                    .values(word.clone())
+                    .execute(conn)
+                {
+                    Ok(_) => dsl::words.filter(dsl::norm.eq(word.norm.clone()))
+                                       .filter(dsl::language.eq(word.language))
+                                       .first::<Word>(conn)
+                        .map_err(|e| DatabaseError::new(
+                            format!("Failed to find word {word:?} in database: {e:?}"),
+                            "Database Error"
+                        )),
+                    Err(e) => Err(DatabaseError::new(
+                        format!(
+                            "Failed to insert word {word:?} in database: {e:?}"
+                        ),
+                        "Database Error",
+                    )),
+                }
+            }
+            Ok(language) => Err(DatabaseError::new(
+                format!("Language {language} is not owned by user {user}"),
+                "Forbidden",
+            )),
+            Err(e) => Err(e),
+        }
+    }
+}
+
 #[derive(Debug, Clone, Insertable)]
 #[diesel(table_name = words)]
 struct NewWordInternal {
@@ -145,6 +199,65 @@ pub struct Word {
 }
 
 impl Word {
+    pub fn find(db: &Database, word: Uuid) -> Result<Word, DatabaseError> {
+        use words::dsl;
+        dsl::words
+            .find(word)
+            .first::<Word>(&mut db.conn()?)
+            .map_err(|e| match e {
+                diesel::NotFound => DatabaseError::new(
+                    format!("Word {word} not found"),
+                    "Not Found",
+                ),
+                e => DatabaseError::new(
+                    format!("Error fetching word {word} from database: {e:?}"),
+                    "Database Error",
+                ),
+            })
+    }
+
+    pub fn is_owned_by(
+        &self,
+        db: &Database,
+        user: &str,
+    ) -> Result<bool, DatabaseError> {
+        let language: Language = Language::find(db, self.language)?;
+        Ok(language.is_owned_by(user))
+    }
+
+    pub fn delete(
+        context: &Context,
+        id: Uuid,
+        user: &str,
+    ) -> Result<(), DatabaseError> {
+        use words::dsl;
+        let conn = &mut context.db.conn()?;
+        match dsl::words.find(id).first::<Word>(conn) {
+            Ok(word) => {
+                if let Ok(true) = word.is_owned_by(&context.db, user) {
+                    match diesel::delete(dsl::words.find(id))
+                        .execute(&mut context.db.conn()?)
+                    {
+                        Ok(_) => Ok(()),
+                        Err(e) => Err(DatabaseError::new(
+                            format!("Failed to delete word {id} from database: {e:?}"),
+                            "Database Error",
+                        )),
+                    }
+                } else {
+                    Err(DatabaseError::new(
+                        format!("User {user} cannot delete word from language he doesn't own"),
+                        "Forbidden"
+                    ))
+                }
+            }
+            Err(e) => Err(DatabaseError::new(
+                format!("Failed to find word {id} in database: {e:?}"),
+                "Database Error",
+            )),
+        }
+    }
+
     fn relationship(
         &self,
         db: &Database,
