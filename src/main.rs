@@ -26,7 +26,11 @@ fn make_cors() -> Result<rocket_cors::Cors, rocket_cors::Error> {
             Method::from(HMethod::Get),
             Method::from(HMethod::Post),
         ]),
-        allowed_headers: AllowedHeaders::some(&["Authorization", "Accept"]),
+        allowed_headers: AllowedHeaders::some(&[
+            "Authorization",
+            "Accept",
+            "Content-Type",
+        ]),
         allowed_origins: match env::var("ORDABOK_HOSTS") {
             Ok(val) => {
                 if val.is_empty() {
